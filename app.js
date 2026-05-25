@@ -313,7 +313,7 @@ async function sendMessage() {
   localStorage.setItem('clinicalkb_chat_count', chatCount.toString());
   updateStats();
   
-  const loadingMsg = addMessage('ai', '<em>新雨正在分析...</em>');
+  const loadingMsg = addMessage('ai', '<div class="msg-loading">新雨正在思考<div class="dots"><span></span><span></span><span></span></div></div>');
   
   try {
     if (apiConfig.provider !== 'local' && apiConfig.key) {
@@ -372,7 +372,7 @@ function addMessage(role, content, sources) {
   }
   msgDiv.innerHTML = content + srcHTML;
   messagesDiv.appendChild(msgDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
   return msgDiv;
 }
 
@@ -385,7 +385,7 @@ function updateMessageContent(msgDiv, content, sources) {
   }
   // 通过 markdownToHTML 渲染后再设置，避免显示原始 ** ### | 等符号
   msgDiv.innerHTML = markdownToHTML(content) + srcHTML;
-  document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+  document.getElementById('chat-messages').scrollTo({ top: document.getElementById('chat-messages').scrollHeight, behavior: 'smooth' });
 }
 
 async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
@@ -446,7 +446,7 @@ async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
     resp = await fetch(endpoint, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({ model: model, messages: messages, stream: false, max_tokens: 4096, search_enable: true })
+      body: JSON.stringify({ model: model, messages: messages, stream: false, max_tokens: 4096, search_enable: true, thinking: { type: 'enabled' } })
     });
   } catch (netErr) {
     console.error('[API] 网络错误:', netErr);
@@ -656,6 +656,11 @@ function updateApiStatus() {
 function markdownToHTML(md) {
   if (!md) return '';
   let html = md;
+
+  // 思考过程区块：--- **思考过程**\n{content} → 特殊样式区域
+  html = html.replace(/\n*---\s*\n\*\*思考过程\*\*\s*\n([\s\S]*?)$/gm, function(_, thinking) {
+    return '\n<div class="thinking-section"><h5>思考过程</h5><div class="thinking-content">' + thinking.trim() + '</div></div>';
+  });
 
   // 代码块（先处理，避免内部格式被干扰）
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');

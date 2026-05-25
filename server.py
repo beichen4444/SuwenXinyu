@@ -35,11 +35,28 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
             try:
                 with urllib.request.urlopen(req, context=ctx, timeout=120) as resp:
+                    resp_data = resp.read()
+                    # 解析 JSON 以提取 reasoning_content 内容（DeepSeek 的思考过程）
+                    try:
+                        data = json.loads(resp_data.decode('utf-8'))
+                        if 'choices' in data and len(data['choices']) > 0:
+                            choice = data['choices'][0]
+                            if 'message' in choice and 'reasoning_content' in choice['message']:
+                                # 将 reasoning 内容附加到 response 中
+                                reasoning = choice['message']['reasoning_content']
+                                if reasoning:
+                                    # 在 response 末尾添加思考过程（用特殊标记分隔）
+                                    if 'content' not in choice['message']:
+                                        choice['message']['content'] = ''
+                                    choice['message']['content'] += '\n\n---\n**思考过程**\n' + reasoning
+                                    resp_data = json.dumps(data).encode('utf-8')
+                    except:
+                        pass  # JSON 解析失败时保持原样
                     self.send_response(resp.status)
                     self.send_header('Content-Type', 'application/json')
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
-                    self.wfile.write(resp.read())
+                    self.wfile.write(resp_data)
             except urllib.error.HTTPError as e:
                 err_body = e.read()
                 self.send_response(e.code)
