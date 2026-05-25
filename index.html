@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>素问新雨 — 临床思维知识库</title>
+<style>
+:root {
+  --ink: #1a1d23; --paper: #f7f5f0; --surface: #fefdfa;
+  --accent: #2b5f8a; --warm: #b8573a; --muted: #6b6d72;
+  --border: #e2ded7; --light: #f0ede7; --sidebar-w: 260px;
+  --radius: 6px; --transition: 0.18s ease-out;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:"Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;
+  background:var(--paper);color:var(--ink);line-height:1.7;
+  min-height:100vh;display:flex;
+}
+
+/* ===== LOGIN OVERLAY ===== */
+.login-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#1c1f26 0%,#2a3040 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+.login-card{
+  background:var(--surface);border-radius:8px;padding:40px 36px;
+  width:380px;max-width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  text-align:center;
+}
+.login-card h1{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+.login-card .login-sub{font-size:0.82rem;color:var(--muted);margin-bottom:28px}
+.login-card input{
+  width:100%;padding:12px 16px;border:1px solid var(--border);
+  border-radius:var(--radius);font-size:1rem;font-family:inherit;
+  text-align:center;letter-spacing:0.15em;transition:all var(--transition);
+}
+.login-card input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,95,138,0.12)}
+.login-card .login-btn{
+  width:100%;margin-top:14px;padding:12px;border:none;border-radius:var(--radius);
+  background:var(--ink);color:#fff;font-size:0.95rem;font-family:inherit;
+  cursor:pointer;font-weight:600;transition:opacity var(--transition);
+}
+.login-card .login-btn:hover{opacity:0.88}
+.login-error{color:var(--warm);font-size:0.8rem;margin-top:10px;display:none}
+
+.sidebar{
+  width:var(--sidebar-w);height:100vh;position:fixed;left:0;top:0;
+  background:#1c1f26;color:#e6e4df;display:flex;flex-direction:column;
+  padding:28px 0;z-index:100;overflow-y:auto;
+}
+.sidebar-brand{padding:0 24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px}
+.sidebar-brand h1{font-size:1.25rem;font-weight:700;letter-spacing:0.02em;color:#f5f3ee}
+.sidebar-brand p{font-size:0.72rem;color:#8a8d94;margin-top:4px;letter-spacing:0.06em;text-transform:uppercase}
+.sidebar-nav{flex:1;padding:8px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:11px 16px;
+  border-radius:var(--radius);cursor:pointer;transition:background var(--transition);
+  font-size:0.9rem;color:#999da8;border:none;background:none;width:100%;
+  text-align:left;font-family:inherit;margin-bottom:2px
+}
+.nav-item:hover{background:rgba(255,255,255,0.05);color:#ddd9d2}
+.nav-item.active{background:rgba(255,255,255,0.1);color:#f5f3ee;font-weight:600}
+.nav-icon{width:20px;text-align:center;font-size:1rem;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--warm);color:#fff;font-size:0.68rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.sidebar-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,0.08);font-size:0.7rem;color:#666a73}
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh}
+.topbar{
+  position:sticky;top:0;z-index:50;background:rgba(254,253,250,0.88);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+  padding:14px 36px;display:flex;align-items:center;justify-content:space-between
+}
+.topbar h2{font-size:1.1rem;font-weight:600}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
+  border-radius:var(--radius);font-size:0.84rem;font-family:inherit;
+  cursor:pointer;border:1px solid transparent;transition:all var(--transition);
+  font-weight:500;white-space:nowrap
+}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:#2d3038}
+.btn-outline{background:transparent;border-color:var(--border);color:var(--ink)}
+.btn-outline:hover{background:var(--light)}
+.btn-sm{padding:5px 12px;font-size:0.76rem}
+.btn-danger{background:var(--warm);color:#fff}
+.btn-danger:hover{background:#9a4a32}
+.page{padding:28px 36px 64px;display:none}
+.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-bottom:32px}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.04)
+}
+.stat-label{font-size:0.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.stat-value{font-size:1.8rem;font-weight:700;line-height:1.15}
+.stat-desc{font-size:0.74rem;color:var(--muted);margin-top:4px}
+.section-title{font-size:1rem;font-weight:600;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid var(--accent);display:inline-block}
+.kb-toolbar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.search-box{flex:1;min-width:220px;position:relative}
+.search-box input{
+  width:100%;padding:10px 16px 10px 38px;border:1px solid var(--border);
+  border-radius:var(--radius);font-size:0.88rem;font-family:inherit;
+  background:var(--surface);color:var(--ink);transition:all var(--transition)
+}
+.search-box input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,95,138,0.1)}
+.search-box .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.category-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px}
+.cat-tab{
+  padding:6px 14px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;cursor:pointer;font-size:0.78rem;font-family:inherit;
+  color:var(--muted);transition:all var(--transition)
+}
+.cat-tab:hover{border-color:var(--accent);color:var(--accent)}
+.cat-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.doc-list{display:flex;flex-direction:column;gap:2px}
+.doc-item{
+  display:flex;align-items:center;gap:14px;padding:13px 16px;
+  border-radius:var(--radius);cursor:pointer;transition:background var(--transition);
+  border:1px solid transparent
+}
+.doc-item:hover{background:var(--light);border-color:var(--border)}
+.doc-icon{font-size:1.25rem;flex-shrink:0}
+.doc-info{flex:1;min-width:0}
+.doc-title{font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-meta{font-size:0.74rem;color:var(--muted);margin-top:2px}
+.doc-actions{display:flex;gap:6px;opacity:0;transition:opacity var(--transition)}
+.doc-item:hover .doc-actions{opacity:1}
+.doc-actions button{
+  background:none;border:1px solid var(--border);border-radius:var(--radius);
+  padding:4px 10px;cursor:pointer;font-size:0.72rem;font-family:inherit;
+  color:var(--muted);transition:all var(--transition)
+}
+.doc-actions button:hover{background:var(--light);color:var(--ink)}
+.chat-container{display:flex;flex-direction:column;height:calc(100vh - 180px);max-width:860px}
+.chat-messages{flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:85%;padding:14px 18px;border-radius:var(--radius);font-size:0.9rem;line-height:1.6}
+.msg.user{align-self:flex-end;background:var(--ink);color:#e6e4df;border-radius:var(--radius) var(--radius) 2px var(--radius)}
+.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius) var(--radius) var(--radius) 2px}
+.msg.ai .msg-sources{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted)}
+.msg.ai .msg-sources span{display:inline-block;background:var(--light);padding:2px 8px;border-radius:3px;margin:2px 4px 2px 0;cursor:pointer}
+.msg img{max-width:100%;max-height:300px;border-radius:4px;margin:8px 0}
+.chat-input-area{border-top:1px solid var(--border);padding-top:12px}
+.chat-input-row{display:flex;gap:10px;margin-bottom:8px}
+.chat-input-row input{
+  flex:1;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:0.9rem;font-family:inherit;background:var(--surface);color:var(--ink)
+}
+.chat-input-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,95,138,0.1)}
+.chat-tools{display:flex;gap:8px;align-items:center}
+.chat-tools label{
+  display:inline-flex;align-items:center;gap:4px;padding:6px 12px;
+  border:1px solid var(--border);border-radius:var(--radius);font-size:0.76rem;
+  cursor:pointer;color:var(--muted);transition:all var(--transition)
+}
+.chat-tools label:hover{border-color:var(--accent);color:var(--accent)}
+.chat-tools input[type=file]{display:none}
+.attachment-preview{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;
+}
+.attachment-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 10px;
+  background:var(--light);border-radius:20px;font-size:0.76rem;
+}
+.attachment-chip button{background:none;border:none;cursor:pointer;font-size:0.9rem;color:var(--warm);padding:0;line-height:1}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .empty-icon{font-size:3rem;margin-bottom:16px;opacity:0.5}
+.empty-state h3{font-size:1.1rem;margin-bottom:8px;color:var(--ink)}
+.empty-state p{font-size:0.85rem;max-width:400px;margin:0 auto}
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  animation:fadeIn 0.15s ease-out
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{
+  background:var(--surface);border-radius:var(--radius);padding:28px 32px;
+  max-width:600px;width:90%;max-height:80vh;overflow-y:auto;
+  box-shadow:0 16px 48px rgba(0,0,0,0.15);animation:slideUp 0.2s ease-out
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal h3{font-size:1.1rem;margin-bottom:16px;font-weight:600}
+.modal label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;color:var(--ink)}
+.modal input,.modal textarea,.modal select{
+  width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:0.88rem;font-family:inherit;margin-bottom:14px;background:var(--surface);color:var(--ink)
+}
+.modal textarea{min-height:200px;resize:vertical;line-height:1.6}
+.modal input:focus,.modal textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,95,138,0.1)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+.toast{
+  position:fixed;bottom:32px;right:32px;background:var(--ink);color:#fff;
+  padding:12px 20px;border-radius:var(--radius);font-size:0.84rem;
+  z-index:300;animation:slideUp 0.2s ease-out;box-shadow:0 6px 20px rgba(0,0,0,0.15)
+}
+.toast.fadeout{animation:fadeOut 0.3s ease-out forwards}
+@keyframes fadeOut{to{opacity:0;transform:translateY(8px)}}
+.api-badge{font-size:0.68rem;padding:3px 10px;border-radius:10px;font-weight:600}
+.api-badge.configured{background:#d4edda;color:#155724}
+.api-badge.unconfigured{background:#f8d7da;color:#721c24}
+.doc-viewer{padding:24px 0;max-width:780px}
+.doc-viewer h2{font-size:1.35rem;margin-bottom:6px}
+.doc-viewer .doc-viewer-meta{font-size:0.78rem;color:var(--muted);margin-bottom:20px}
+.doc-viewer .doc-viewer-body{font-size:0.92rem;line-height:1.8}
+.doc-viewer .doc-viewer-body h3{font-size:1.05rem;margin:22px 0 10px;font-weight:600}
+.doc-viewer .doc-viewer-body p{margin-bottom:10px}
+.doc-viewer .doc-viewer-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.84rem}
+.doc-viewer .doc-viewer-body td,.doc-viewer .doc-viewer-body th{border:1px solid var(--border);padding:8px 12px;text-align:left}
+.doc-viewer .doc-viewer-body th{background:var(--light);font-weight:600}
+.back-btn{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 0;margin-bottom:16px;
+  background:none;border:none;cursor:pointer;font-size:0.84rem;color:var(--muted);
+  font-family:inherit;transition:color var(--transition)
+}
+.back-btn:hover{color:var(--ink)}
+
+/* File upload drop zone */
+.drop-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);padding:32px;
+  text-align:center;cursor:pointer;transition:all var(--transition);margin-bottom:16px
+}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(43,95,138,0.03)}
+.drop-zone p{color:var(--muted);font-size:0.84rem}
+.drop-zone .drop-icon{font-size:2rem;margin-bottom:8px}
+
+/* Image viewer */
+.image-preview-modal{
+  position:fixed;inset:0;z-index:250;background:rgba(0,0,0,0.85);
+  display:flex;align-items:center;justify-content:center;cursor:pointer
+}
+.image-preview-modal img{max-width:90vw;max-height:90vh;border-radius:4px;object-fit:contain}
+</style>
+</head>
+<body>
+
+<!-- Login Overlay -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <h1>素问新雨</h1>
+    <div class="login-sub">临床思维知识库</div>
+    <input type="password" id="login-password" placeholder="请输入访问密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">进入知识库</button>
+    <div class="login-error" id="login-error">密码错误，请重试</div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="app-sidebar" style="display:none">
+  <div class="sidebar-brand">
+    <h1>素问新雨</h1>
+    <p>临床思维知识库</p>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">&#9673;</span> 工作台
+    </button>
+    <button class="nav-item" data-page="knowledge">
+      <span class="nav-icon">&#9776;</span> 知识库
+      <span class="nav-badge" id="doc-count-badge">2</span>
+    </button>
+    <button class="nav-item" data-page="chat">
+      <span class="nav-icon">&#9998;</span> 新雨 AI
+    </button>
+    <button class="nav-item" data-page="files">
+      <span class="nav-icon">&#128193;</span> 文件处理
+    </button>
+    <button class="nav-item" data-page="manage">
+      <span class="nav-icon">&#9881;</span> 管理
+    </button>
+  </nav>
+  <div class="sidebar-footer">素问新雨 · PBL 案例<br>DeepSeek V3 驱动</div>
+</aside>
+
+<!-- Main Content -->
+<main class="main" id="app-main" style="display:none">
+  <div class="topbar">
+    <h2 id="page-title">工作台</h2>
+    <div class="topbar-actions">
+      <span class="api-badge configured" id="api-status-badge">DeepSeek V3</span>
+      <button class="btn btn-outline btn-sm" onclick="showApiConfig()">配置 API</button>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">退出</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <section class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">知识库文档</div><div class="stat-value" id="stat-docs">2</div><div class="stat-desc">预置 + 自定义文档</div></div>
+      <div class="stat-card"><div class="stat-label">PBL 提问条目</div><div class="stat-value">33</div><div class="stat-desc">覆盖六大知识领域</div></div>
+      <div class="stat-card"><div class="stat-label">AI 问答次数</div><div class="stat-value" id="stat-chats">0</div><div class="stat-desc">本次会话统计</div></div>
+      <div class="stat-card"><div class="stat-label">AI 引擎</div><div class="stat-value" style="font-size:1.2rem">DeepSeek V3</div><div class="stat-desc">支持文本 · 识图 · 文件分析</div></div>
+    </div>
+    <div style="margin-top:12px">
+      <span class="section-title">快速入口</span>
+      <div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="switchPage('chat')">开始 AI 问答</button>
+        <button class="btn btn-outline" onclick="switchPage('knowledge')">浏览知识库</button>
+        <button class="btn btn-outline" onclick="switchPage('files')">上传文件分析</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Knowledge Base -->
+  <section class="page" id="page-knowledge">
+    <div class="kb-toolbar">
+      <div class="search-box">
+        <span class="search-icon">&#9906;</span>
+        <input type="text" id="kb-search" placeholder="搜索知识库内容..." oninput="renderDocList()">
+      </div>
+    </div>
+    <div class="category-tabs" id="category-tabs"></div>
+    <div class="doc-list" id="doc-list"></div>
+    <div class="doc-viewer" id="doc-viewer" style="display:none"></div>
+  </section>
+
+  <!-- AI Chat -->
+  <section class="page" id="page-chat">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;font-size:0.82rem;color:var(--muted)">
+      <span>AI引擎：<strong>DeepSeek V3</strong></span>
+      <span>|</span>
+      <span>支持：文本对话 · 图片识别 · 文件分析</span>
+    </div>
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg ai">
+          你好，我是新雨，素问新雨小组的临床思维AI助手，由 DeepSeek V3 驱动。<br><br>
+          我可以：<br>
+          &#8226; 基于知识库回答PBL案例问题<br>
+          &#8226; 识别和分析图片内容（点击输入框下方的 📷 上传）<br>
+          &#8226; 处理和分析文档文件（点击 📎 上传）<br>
+          &#8226; 解读产前筛查指标（NT、AFP、hCG、uE3、InhA）<br>
+          &#8226; 解答33个PBL提问
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="attachment-preview" id="attachment-preview"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="输入你的问题，或上传图片/文件..." onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
+          <button class="btn btn-primary" onclick="sendMessage()">发送</button>
+        </div>
+        <div class="chat-tools">
+          <label title="上传图片"><span>&#128247;</span> 图片<input type="file" accept="image/*" multiple onchange="handleFileAttach(this,'image')" id="img-input"></label>
+          <label title="上传文件"><span>&#128206;</span> 文件<input type="file" accept=".pdf,.doc,.docx,.txt,.md,.xlsx,.pptx" multiple onchange="handleFileAttach(this,'file')" id="file-input"></label>
+          <span style="font-size:0.72rem;color:var(--muted);margin-left:auto">Shift+Enter 换行</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- File Processing -->
+  <section class="page" id="page-files">
+    <span class="section-title">文件处理中心</span>
+    <p style="font-size:0.84rem;color:var(--muted);margin-bottom:20px">上传图片或文档，新雨AI将自动分析处理。支持 JPG/PNG/GIF 图片识别，以及 PDF/Word/Excel/TXT/MD 文档分析。</p>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-upload-input').click()">
+      <div class="drop-icon">&#128229;</div>
+      <p>拖拽文件到此处，或点击上传</p>
+      <p style="font-size:0.72rem;color:var(--muted);margin-top:4px">支持：图片（JPG/PNG/GIF）、文档（PDF/Word/Excel/TXT/MD）</p>
+      <input type="file" id="file-upload-input" accept="image/*,.pdf,.doc,.docx,.txt,.md,.xlsx,.pptx" multiple onchange="handleFileDrop(this.files)" style="display:none">
+    </div>
+    <div id="file-results"></div>
+  </section>
+
+  <!-- Manage -->
+  <section class="page" id="page-manage">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <span class="section-title">文档管理</span>
+      <button class="btn btn-primary" onclick="openAddDocModal()">+ 新建文档</button>
+    </div>
+    <div class="doc-list" id="manage-doc-list"></div>
+    <div class="empty-state" id="manage-empty" style="display:none">
+      <div class="empty-icon">&#128196;</div>
+      <h3>暂无文档</h3>
+      <p>点击上方按钮添加知识库文档</p>
+    </div>
+  </section>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="doc-modal" style="display:none" onclick="if(event.target===this)closeDocModal()">
+  <div class="modal">
+    <h3 id="modal-title">新建文档</h3>
+    <label>标题</label>
+    <input type="text" id="modal-doc-title" placeholder="文档标题">
+    <label>分类</label>
+    <select id="modal-doc-category">
+      <option value="病例摘要">病例摘要</option><option value="提问整理">提问整理</option>
+      <option value="基础医学">基础医学</option><option value="临床诊断">临床诊断</option>
+      <option value="产前筛查">产前筛查</option><option value="遗传咨询">遗传咨询</option>
+      <option value="自定义">自定义</option>
+    </select>
+    <label>内容（支持 Markdown）</label>
+    <textarea id="modal-doc-content" placeholder="输入文档内容..."></textarea>
+    <input type="hidden" id="modal-doc-id">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeDocModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveDoc()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- API Config Modal -->
+<div class="modal-overlay" id="api-modal" style="display:none" onclick="if(event.target===this)closeApiModal()">
+  <div class="modal">
+    <h3>AI 配置</h3>
+    <label>AI 提供商</label>
+    <select id="api-modal-provider" onchange="toggleApiFields()">
+      <option value="deepseek">DeepSeek（推荐）</option>
+      <option value="openai">OpenAI 兼容</option>
+      <option value="custom">自定义端点</option>
+      <option value="local">本地检索</option>
+    </select>
+    <label>API Key</label>
+    <input type="password" id="api-modal-key" placeholder="sk-...">
+    <div id="api-modal-endpoint-group">
+      <label>API 端点</label>
+      <input type="text" id="api-modal-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+    </div>
+    <label>模型名称</label>
+    <input type="text" id="api-modal-model" placeholder="deepseek-chat">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeApiModal()">取消</button>
+      <button class="btn btn-primary" onclick="confirmApiConfig()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="knowledge-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
