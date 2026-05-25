@@ -142,6 +142,20 @@ body{
 .msg.ai .msg-sources{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted)}
 .msg.ai .msg-sources span{display:inline-block;background:var(--light);padding:2px 8px;border-radius:3px;margin:2px 4px 2px 0;cursor:pointer}
 .msg img{max-width:100%;max-height:300px;border-radius:4px;margin:8px 0}
+/* Markdown 渲染样式（AI 消息内） */
+.msg.ai table{width:100%;border-collapse:collapse;margin:10px 0;font-size:0.82rem}
+.msg.ai table td{padding:6px 10px;border:1px solid var(--border);vertical-align:top}
+.msg.ai table tr:first-child td{background:var(--light);font-weight:600}
+.msg.ai h1,.msg.ai h2,.msg.ai h3,.msg.ai h4{margin:12px 0 6px;line-height:1.3}
+.msg.ai h1{font-size:1.25rem}.msg.ai h2{font-size:1.15rem}.msg.ai h3{font-size:1.05rem}.msg.ai h4{font-size:0.95rem}
+.msg.ai p{margin:6px 0}
+.msg.ai ul,.msg.ai ol{padding-left:20px;margin:6px 0}
+.msg.ai li{margin:2px 0}
+.msg.ai pre{background:var(--light);padding:12px;border-radius:4px;overflow-x:auto;font-size:0.82rem;margin:8px 0}
+.msg.ai code{font-family:'Consolas','Courier New',monospace;font-size:0.84rem}
+.msg.ai blockquote{border-left:3px solid var(--accent);padding:6px 14px;margin:10px 0;color:var(--muted);font-style:italic}
+.msg.ai hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.msg.ai strong{color:var(--ink)}
 .chat-input-area{border-top:1px solid var(--border);padding-top:12px}
 .chat-input-row{display:flex;gap:10px;margin-bottom:8px}
 .chat-input-row input{
@@ -271,7 +285,7 @@ body{
       <span class="nav-icon">&#9881;</span> 管理
     </button>
   </nav>
-  <div class="sidebar-footer">素问新雨 · PBL 案例<br>DeepSeek V3 驱动</div>
+  <div class="sidebar-footer">素问新雨 · PBL 案例<br>DeepSeek V4 Pro 驱动</div>
 </aside>
 
 <!-- Main Content -->
@@ -279,7 +293,7 @@ body{
   <div class="topbar">
     <h2 id="page-title">工作台</h2>
     <div class="topbar-actions">
-      <span class="api-badge configured" id="api-status-badge">DeepSeek V3</span>
+      <span class="api-badge configured" id="api-status-badge">DeepSeek V4 Pro</span>
       <button class="btn btn-outline btn-sm" onclick="showApiConfig()">配置 API</button>
       <button class="btn btn-outline btn-sm" onclick="doLogout()">退出</button>
     </div>
@@ -291,7 +305,7 @@ body{
       <div class="stat-card"><div class="stat-label">知识库文档</div><div class="stat-value" id="stat-docs">2</div><div class="stat-desc">预置 + 自定义文档</div></div>
       <div class="stat-card"><div class="stat-label">PBL 提问条目</div><div class="stat-value">33</div><div class="stat-desc">覆盖六大知识领域</div></div>
       <div class="stat-card"><div class="stat-label">AI 问答次数</div><div class="stat-value" id="stat-chats">0</div><div class="stat-desc">本次会话统计</div></div>
-      <div class="stat-card"><div class="stat-label">AI 引擎</div><div class="stat-value" style="font-size:1.2rem">DeepSeek V3</div><div class="stat-desc">支持文本 · 识图 · 文件分析</div></div>
+      <div class="stat-card"><div class="stat-label">AI 引擎</div><div class="stat-value" style="font-size:1.2rem">DeepSeek V4 Pro</div><div class="stat-desc">支持文本 · 识图 · 文件分析</div></div>
     </div>
     <div style="margin-top:12px">
       <span class="section-title">快速入口</span>
@@ -319,14 +333,14 @@ body{
   <!-- AI Chat -->
   <section class="page" id="page-chat">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;font-size:0.82rem;color:var(--muted)">
-      <span>AI引擎：<strong>DeepSeek V3</strong></span>
+      <span>AI引擎：<strong>DeepSeek V4 Pro</strong></span>
       <span>|</span>
       <span>支持：文本对话 · 图片识别 · 文件分析</span>
     </div>
     <div class="chat-container">
       <div class="chat-messages" id="chat-messages">
         <div class="msg ai">
-          你好，我是新雨，素问新雨小组的临床思维AI助手，由 DeepSeek V3 驱动。<br><br>
+          你好，我是新雨，素问新雨小组的临床思维AI助手，由 DeepSeek V4 Pro 驱动。<br><br>
           我可以：<br>
           &#8226; 基于知识库回答PBL案例问题<br>
           &#8226; 识别和分析图片内容（点击输入框下方的 📷 上传）<br>
@@ -419,7 +433,7 @@ body{
       <input type="text" id="api-modal-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
     </div>
     <label>模型名称</label>
-    <input type="text" id="api-modal-model" placeholder="deepseek-chat">
+    <input type="text" id="api-modal-model" placeholder="deepseek-v4-pro">
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeApiModal()">取消</button>
       <button class="btn btn-primary" onclick="confirmApiConfig()">确认</button>

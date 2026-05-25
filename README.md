@@ -8,19 +8,23 @@ PBL 案例「宝宝对不起」知识库网站，由 DeepSeek V3 驱动的临床
 - **新雨 AI**：基于知识库的智能问答，支持图片识别、文件分析
 - **密码保护**：访问需输入密码
 
+## 在线访问
+
+GitHub Pages: [https://beichen4444.github.io/SuwenXinyu/](https://beichen4444.github.io/SuwenXinyu/)
+
+密码：`1133`
+
+> 注意：GitHub Pages 部署时，DeepSeek API 可能因 CORS 限制不可用。如需完整 AI 功能，请使用下方的本地运行方式。
+
 ## 本地运行
 
 ```bash
-# 安装依赖（Python 3）
-pip install -r requirements.txt  # 无额外依赖，标准库即可
-
-# 启动服务器
 python server.py
 ```
 
 浏览器访问 `http://localhost:8800`，输入密码 `1133`。
 
-也可双击 `启动.bat` 一键启动。
+也可双击 `启动.bat` 一键启动。本地运行通过代理服务器完美解决 CORS，AI 问答、识图、文件分析全部可用。
 
 ## 技术栈
 

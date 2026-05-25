@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>素问新雨 - 诊断页面</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        .test { background: #f5f5f5; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0; }
+        .fail { border-left-color: #f44336; }
+        .log { background: #333; color: #fff; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>素问新雨 - 系统诊断</h2>
+    
+    <div class="test" id="test-localstorage">
+        <h3>1. localStorage 检查</h3>
+        <p id="ls-status">正在检测...</p>
+    </div>
+    
+    <div class="test" id="test-api-config">
+        <h3>2. API 配置检查</h3>
+        <p id="api-status">正在检测...</p>
+    </div>
+    
+    <div class="test" id="test-fetch">
+        <h3>3. fetch() 可用性</h3>
+        <p id="fetch-status">正在检测...</p>
+    </div>
+    
+    <div class="test" id="test-proxy">
+        <h3>4. 代理服务器连接</h3>
+        <button onclick="testProxy()">测试代理连接</button>
+        <p id="proxy-status">等待测试...</p>
+    </div>
+    
+    <div class="test">
+        <h3>5. 控制台日志</h3>
+        <div class="log" id="console-log"></div>
+    </div>
+    
+    <div class="test">
+        <h3>6. 修复建议</h3>
+        <ul>
+            <li>确保已通过 <code>启动.bat</code> 启动代理服务器（http://localhost:8800）</li>
+            <li>不要直接双击 <code>index.html</code> 文件打开</li>
+            <li>按 F12 打开开发者工具，查看 Console 标签页的错误信息</li>
+            <li>如果仍有问题，尝试 <button onclick="clearCache()">清理 localStorage 缓存</button></li>
+        </ul>
+    </div>
+    
+    <script>
+        const logEl = document.getElementById('console-log');
+        function log(msg) {
+            logEl.textContent += msg + '\n';
+            console.log(msg);
+        }
+        
+        // 重写 console 方法以捕获日志
+        const origLog = console.log;
+        const origError = console.error;
+        console.log = function(...args) { 
+            log('[LOG] ' + args.join(' ')); 
+            origLog.apply(console, args); 
+        };
+        console.error = function(...args) { 
+            log('[ERROR] ' + args.join(' ')); 
+            origError.apply(console, args); 
+        };
+        
+        // 1. localStorage 检查
+        try {
+            const lsTest = 'test_' + Date.now();
+            localStorage.setItem(lsTest, 'ok');
+            const read = localStorage.getItem(lsTest);
+            localStorage.removeItem(lsTest);
+            document.getElementById('ls-status').innerHTML = 
+                read === 'ok' ? '✅ 正常（支持 localStorage）' : '⚠️ 读取不一致';
+        } catch (e) {
+            document.getElementById('ls-status').innerHTML = '❌ 异常：' + e.message;
+            document.getElementById('test-localstorage').classList.add('fail');
+        }
+        
+        // 2. API 配置检查
+        try {
+            const config = JSON.parse(localStorage.getItem('clinicalkb_api_config') || '{}');
+            const hasKey = config.key && config.key.startsWith('sk-');
+            const hasModel = config.model && config.model.includes('deepseek');
+            const status = document.getElementById('api-status');
+            if (hasKey && hasModel) {
+                status.innerHTML = '✅ 配置完整<br>Key: ' + config.key.substring(0, 8) + '...<br>模型: ' + config.model;
+            } else {
+                status.innerHTML = '⚠️ 配置不完整或缺失<br>Key: ' + (hasKey ? '已设置' : '缺失') + '<br>模型: ' + (config.model || '未设置');
+                document.getElementById('test-api-config').classList.add('fail');
+            }
+        } catch (e) {
+            document.getElementById('api-status').innerHTML = '❌ 解析错误：' + e.message;
+            document.getElementById('test-api-config').classList.add('fail');
+        }
+        
+        // 3. fetch 可用性
+        if (window.fetch) {
+            document.getElementById('fetch-status').innerHTML = '✅ 支持 fetch API';
+        } else {
+            document.getElementById('fetch-status').innerHTML = '❌ 浏览器不支持 fetch';
+            document.getElementById('test-fetch').classList.add('fail');
+        }
+        
+        // 4. 代理测试
+        window.testProxy = async function() {
+            const status = document.getElementById('proxy-status');
+            status.innerHTML = '正在连接 http://localhost:8800/api/chat ...';
+            try {
+                const resp = await fetch('http://localhost:8800/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'sk-4ae6369348aa4ae68e43f6b6157bc416' },
+                    body: JSON.stringify({ model: 'deepseek-v4-pro', messages: [{role:'user',content:'ping'}], max_tokens: 5 })
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    status.innerHTML = '✅ 代理服务器正常<br>状态码: ' + resp.status + '<br>模型: ' + (data.model || '?');
+                } else {
+                    status.innerHTML = '❌ 代理返回错误: ' + resp.status;
+                    document.getElementById('test-proxy').classList.add('fail');
+                }
+            } catch (e) {
+                status.innerHTML = '❌ 连接失败: ' + e.message;
+                document.getElementById('test-proxy').classList.add('fail');
+            }
+        };
+        
+        // 清理缓存
+        window.clearCache = function() {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('clinicalkb_')) keys.push(k);
+            }
+            keys.forEach(k => localStorage.removeItem(k));
+            localStorage.setItem('clinicalkb_app_version', '2.0.0');
+            alert('已清理 ' + keys.length + ' 项缓存，请刷新页面');
+        };
+        
+        log('诊断页面加载完成 - ' + new Date().toLocaleTimeString());
+        log('当前地址: ' + window.location.href);
+        log('主机名: ' + window.location.hostname);
+    </script>
+</body>
+</html>

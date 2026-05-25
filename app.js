@@ -33,13 +33,33 @@ function doLogout() {
   }
 })();
 
+/* ===== 版本管理：版本号变更时自动清理旧缓存 ===== */
+const APP_VERSION = '2.0.0';
+(function() {
+  const storedVer = localStorage.getItem('clinicalkb_app_version');
+  if (storedVer !== APP_VERSION) {
+    // 版本不匹配：清理可能冲突的旧配置
+    const keysToKeep = ['clinicalkb_user_docs', 'clinicalkb_chat_count'];
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('clinicalkb_') && !keysToKeep.includes(k)) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('clinicalkb_app_version', APP_VERSION);
+    console.log('[版本升级] 已清理 ' + keysToRemove.length + ' 项旧缓存，版本: ' + APP_VERSION);
+  }
+})();
+
 /* ===== 应用状态 ===== */
 let currentPage = 'dashboard';
 let currentDocView = null;
 let chatHistory = [];
 let userDocs = JSON.parse(localStorage.getItem('clinicalkb_user_docs') || '[]');
 let apiConfig = JSON.parse(localStorage.getItem('clinicalkb_api_config') || 
-  '{"provider":"deepseek","key":"sk-4ae6369348aa4ae68e43f6b6157bc416","endpoint":"https://api.deepseek.com/v1/chat/completions","model":"deepseek-chat"}');
+  '{"provider":"deepseek","key":"sk-4ae6369348aa4ae68e43f6b6157bc416","endpoint":"https://api.deepseek.com/v1/chat/completions","model":"deepseek-v4-pro"}');
 let chatCount = parseInt(localStorage.getItem('clinicalkb_chat_count') || '0');
 let attachedFiles = [];
 
@@ -284,6 +304,8 @@ async function sendMessage() {
   }
   
   addMessage('user', displayMsg);
+  // 记录对话历史（文本部分）
+  chatHistory.push({ role: 'user', content: message });
   input.value = '';
   attachedFiles = [];
   renderAttachments();
@@ -298,6 +320,7 @@ async function sendMessage() {
       await callExternalAI(message, imageBases, fileContents, loadingMsg);
     } else {
       const response = generateAIResponse(message);
+      chatHistory.push({ role: 'assistant', content: response.content });
       updateMessageContent(loadingMsg, response.content, response.sources);
     }
   } catch (e) {
@@ -360,7 +383,8 @@ function updateMessageContent(msgDiv, content, sources) {
       '<span onclick="showDocViewer(\'' + s.id + '\')">' + s.title + '</span>'
     ).join('') + '</div>';
   }
-  msgDiv.innerHTML = content + srcHTML;
+  // 通过 markdownToHTML 渲染后再设置，避免显示原始 ** ### | 等符号
+  msgDiv.innerHTML = markdownToHTML(content) + srcHTML;
   document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
 }
 
@@ -379,12 +403,18 @@ async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
     knowledgeContext = allDocs.map(d => '文档：' + d.title + '\n' + d.content.substring(0, 500)).join('\n---\n');
   }
   
-  const systemPrompt = '你是「新雨」，素问新雨小组的临床思维AI助手，由DeepSeek V3驱动。基于知识库内容回答用户问题。请专业、准确、详细。如果用户上传了图片，请仔细描述图片中的内容（文字、图表、数据等）并进行分析。如果上传了文件，请分析文件内容。如知识库无直接答案，请基于医学知识补充，并说明来源。\n\n知识库内容：\n' + knowledgeContext;
+  const systemPrompt = '你是「新雨」，素问新雨小组的临床思维AI助手。请简洁、专业地回答问题，像DeepSeek网页版那样直接给出核心信息，避免冗长嵌套列表。优先基于知识库，无答案时联网搜索。\n\n知识库：\n' + knowledgeContext;
   
-  // 构建消息
+  // 构建消息：system + 历史对话 + 当前用户消息
   const messages = [{ role: 'system', content: systemPrompt }];
   
-  // 用户消息（多模态）
+  // 插入最近 20 轮对话历史（让 AI 记住上下文）
+  const recentHistory = chatHistory.slice(-40); // 最多 20 轮（每轮 user+assistant）
+  for (const h of recentHistory) {
+    messages.push({ role: h.role, content: h.content });
+  }
+  
+  // 当前用户消息（多模态）
   const userContent = [];
   userContent.push({ type: 'text', text: query || '请分析我上传的图片和文件' });
   
@@ -400,22 +430,40 @@ async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
   
   messages.push({ role: 'user', content: userContent });
   
-  const model = apiConfig.model || 'deepseek-chat';
+  const model = apiConfig.model || 'deepseek-v4-pro';
   
-  // 通过本地代理服务器调用 DeepSeek API（解决 CORS 问题）
-  const resp = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiConfig.key },
-    body: JSON.stringify({ model: model, messages: messages, stream: false, max_tokens: 4096 })
-  });
+  // 判断环境：本地开发用代理，GitHub Pages 用直接调用
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const endpoint = isLocal ? '/api/chat' : (apiConfig.endpoint || 'https://api.deepseek.com/v1/chat/completions');
+  const headers = isLocal 
+    ? { 'Content-Type': 'application/json', 'X-API-Key': apiConfig.key }
+    : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.key };
+  
+  console.log('[API] 请求环境:', isLocal ? '本地代理' : '在线直连', '端点:', endpoint, '模型:', model);
+  
+  let resp;
+  try {
+    resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ model: model, messages: messages, stream: false, max_tokens: 4096, search_enable: true })
+    });
+  } catch (netErr) {
+    console.error('[API] 网络错误:', netErr);
+    throw new Error('网络连接失败：' + netErr.message + '。请确认已通过「启动.bat」启动代理服务器（http://localhost:8800），而不是直接打开 index.html。');
+  }
   
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error('API ' + resp.status + ': ' + errText.substring(0, 100));
+    console.error('[API] 响应错误:', resp.status, errText.substring(0, 200));
+    throw new Error('API ' + resp.status + ': ' + errText.substring(0, 150));
   }
   
   const data = await resp.json();
   const content = data.choices?.[0]?.message?.content || 'API返回为空';
+  
+  // 记录 AI 回复到对话历史
+  chatHistory.push({ role: 'assistant', content: content });
   
   const relevantDocs = query ? findRelevantDocs(query, allDocs, 2) : [];
   updateMessageContent(loadingMsg, content, relevantDocs.map(d => ({ id: d.id, title: d.title })));
@@ -456,7 +504,7 @@ function generateAIResponse(query) {
       response = '根据知识库文档「' + doc.title + '」：\n\n' + doc.content.substring(0, 300) + (doc.content.length > 300 ? '...' : '');
     }
   } else {
-    response = '我是新雨，主要由DeepSeek V3驱动。你可以：\n\n• 询问PBL案例相关问题\n• 上传医学图片让我识别分析\n• 上传文档让我解读\n• 询问产前筛查指标（NT、hCG、AFP、uE3、InhA）\n• 讨论唐氏综合征的病因与机制';
+    response = '我是新雨，主要由DeepSeek V4 Pro驱动。你可以：\n\n• 询问PBL案例相关问题\n• 上传医学图片让我识别分析\n• 上传文档让我解读\n• 询问产前筛查指标（NT、hCG、AFP、uE3、InhA）\n• 讨论唐氏综合征的病因与机制';
   }
   
   return { content: response, sources: topDocs.map(d => ({ id: d.id, title: d.title })) };
@@ -546,7 +594,7 @@ function showApiConfig() {
   document.getElementById('api-modal-provider').value = apiConfig.provider || 'deepseek';
   document.getElementById('api-modal-key').value = apiConfig.key || '';
   document.getElementById('api-modal-endpoint').value = apiConfig.endpoint || 'https://api.deepseek.com/v1/chat/completions';
-  document.getElementById('api-modal-model').value = apiConfig.model || 'deepseek-chat';
+  document.getElementById('api-modal-model').value = apiConfig.model || 'deepseek-v4-pro';
   toggleApiFields();
   modal.style.display = 'flex';
 }
@@ -593,7 +641,7 @@ function saveApiConfig() {
 function updateApiStatus() {
   const badge = document.getElementById('api-status-badge');
   if (apiConfig.provider === 'deepseek' && apiConfig.key) {
-    badge.textContent = 'DeepSeek V3';
+    badge.textContent = 'DeepSeek V4 Pro';
     badge.className = 'api-badge configured';
   } else if (apiConfig.key) {
     badge.textContent = 'AI 已配置';
@@ -606,13 +654,54 @@ function updateApiStatus() {
 
 /* ===== 工具函数 ===== */
 function markdownToHTML(md) {
-  return md
-    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n\n/g, '<br><br>');
+  if (!md) return '';
+  let html = md;
+
+  // 代码块（先处理，避免内部格式被干扰）
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+
+  // 表格（多行 | col | col | 结构）
+  html = html.replace(/(^\|.*\|$\n)+/gm, function(tableBlock) {
+    const rows = tableBlock.trim().split('\n').filter(function(r) { return r.indexOf('|') >= 0 && !/^\|[\s\-:]+\|/.test(r); });
+    if (rows.length === 0) return tableBlock;
+    const cells = rows.map(function(r) {
+      const tds = r.split('|').filter(function(c) { return c.trim(); });
+      return '<tr>' + tds.map(function(c) { return '<td>' + c.trim() + '</td>'; }).join('') + '</tr>';
+    });
+    return '<table>' + cells.join('') + '</table>';
+  });
+
+  // 标题
+  html = html.replace(/^#### (.*$)/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+
+  // 粗体和斜体
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  // 无序列表
+  html = html.replace(/^- (.*$)/gm, '<li>$1</li>');
+  html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+  // 引用
+  html = html.replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>');
+
+  // 水平线
+  html = html.replace(/^---$/gm, '<hr>');
+
+  // 换行（连续空行 → 段落分隔，单换行 → <br>）
+  html = html.replace(/<br>\s*<br>/g, '</p><p>');
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+  html = '<p>' + html + '</p>';
+
+  // 清理空段落
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  html = html.replace(/<p><\/p>/g, '');
+
+  return html;
 }
 
 function showToast(message, type) {
