@@ -151,11 +151,27 @@ body{min-height:100vh;display:flex;overflow:hidden}
 .back-btn:hover{color:var(--ink)}
 
 /* ===== 聊天界面（对齐 Marvis 风格） ===== */
-.chat-container{display:flex;flex-direction:column;height:100%;max-width:880px;margin:0 auto}
+.chat-container{display:flex;flex-direction:column;height:100%;max-width:880px;margin:0 auto;min-height:0;position:relative}
 .chat-messages{
   flex:1;overflow-y:auto;padding:20px 0 20px 0;display:flex;flex-direction:column;
-  gap:16px;scroll-behavior:smooth
+  gap:16px;scroll-behavior:smooth;min-height:0
 }
+/* 滚动条美化 */
+.chat-messages::-webkit-scrollbar{width:5px}
+.chat-messages::-webkit-scrollbar-track{background:transparent}
+.chat-messages::-webkit-scrollbar-thumb{background:#d0ccc4;border-radius:10px}
+.chat-messages::-webkit-scrollbar-thumb:hover{background:#b0aba0}
+
+/* 回到底部按钮 */
+.scroll-to-bottom{
+  position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+  width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;
+  border:none;cursor:pointer;font-size:1rem;display:none;align-items:center;
+  justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);
+  z-index:10;transition:all var(--transition);opacity:0.9
+}
+.scroll-to-bottom:hover{opacity:1;transform:translateX(-50%) translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+.scroll-to-bottom.visible{display:flex}
 
 .msg{max-width:85%;padding:12px 16px;border-radius:var(--radius);font-size:0.9rem;line-height:1.6;animation:msgSlideIn 0.25s ease-out}
 .msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-radius:var(--radius) var(--radius) 4px var(--radius);animation:msgSlideInRight 0.25s ease-out}
@@ -178,6 +194,7 @@ body{min-height:100vh;display:flex;overflow:hidden}
 .msg.ai p{margin:6px 0}
 .msg.ai ul,.msg.ai ol{padding-left:20px;margin:6px 0}
 .msg.ai li{margin:2px 0}
+mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
 .msg.ai pre{background:var(--light);padding:12px;border-radius:4px;overflow-x:auto;font-size:0.82rem;margin:8px 0}
 .msg.ai code{font-family:'Consolas','Courier New',monospace;font-size:0.84rem}
 .msg.ai blockquote{border-left:3px solid var(--accent);padding:6px 14px;margin:10px 0;color:var(--muted);font-style:italic}
@@ -287,6 +304,146 @@ body{min-height:100vh;display:flex;overflow:hidden}
   display:flex;align-items:center;justify-content:center;cursor:pointer
 }
 .image-preview-modal img{max-width:90vw;max-height:90vh;border-radius:4px;object-fit:contain}
+
+/* ===== 移动端专属底部导航 ===== */
+.mobile-bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  background:#fff;border-top:1px solid var(--border);display:none;
+  padding:8px 0 12px;box-shadow:0 -2px 12px rgba(0,0,0,0.08)
+}
+.mobile-nav-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:0 8px
+}
+.mobile-nav-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:none;border:none;padding:8px 4px;border-radius:8px;
+  cursor:pointer;font-family:inherit;transition:background var(--transition)
+}
+.mobile-nav-item:hover,.mobile-nav-item.active{background:var(--light)}
+.mobile-nav-icon{font-size:1.2rem;line-height:1;color:var(--muted)}
+.mobile-nav-item:hover .mobile-nav-icon,.mobile-nav-item.active .mobile-nav-icon{color:var(--accent)}
+.mobile-nav-label{font-size:0.6rem;color:var(--muted);font-weight:500}
+.mobile-nav-item:hover .mobile-nav-label,.mobile-nav-item.active .mobile-nav-label{color:var(--accent)}
+
+/* 移动端聊天输入优化 */
+.mobile-chat-input{
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:99;
+  background:#fff;border-top:1px solid var(--border);padding:12px 16px;
+  box-shadow:0 -2px 12px rgba(0,0,0,0.1)
+}
+.mobile-input-row{
+  display:flex;gap:10px;align-items:center;background:var(--light);
+  border:1px solid var(--border);border-radius:20px;padding:8px 12px
+}
+.mobile-input-row input{
+  flex:1;border:none;background:transparent;font-size:0.95rem;
+  padding:6px 0;font-family:inherit;color:var(--ink)
+}
+.mobile-input-row input:focus{outline:none}
+.mobile-send-btn{
+  background:var(--accent);color:#fff;border:none;border-radius:50%;
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:1rem;transition:opacity var(--transition)
+}
+.mobile-send-btn:hover{opacity:0.9}
+.mobile-attach-btn{
+  background:none;border:none;font-size:1.2rem;color:var(--muted);
+  cursor:pointer;padding:4px;transition:color var(--transition)
+}
+.mobile-attach-btn:hover{color:var(--accent)}
+
+/* 移动端消息优化 */
+.mobile-msg{max-width:88%;padding:10px 14px;font-size:0.92rem;line-height:1.5}
+.mobile-msg.user{background:var(--accent);color:#fff;border-radius:16px 16px 4px 16px}
+.mobile-msg.ai{background:#f0f2f5;color:var(--ink);border-radius:16px 16px 16px 4px}
+.mobile-msg.ai .msg-sources{
+  margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);
+  font-size:0.7rem;color:#666
+}
+
+/* 移动端文件上传 */
+.mobile-upload-sheet{
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:#fff;border-radius:16px 16px 0 0;padding:20px 16px 32px;
+  box-shadow:0 -4px 24px rgba(0,0,0,0.15);display:none;
+  animation:slideUp 0.3s ease-out
+}
+.mobile-upload-title{
+  font-size:1rem;font-weight:600;margin-bottom:16px;text-align:center
+}
+.mobile-upload-options{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px
+}
+.mobile-upload-option{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:20px 12px;border:1px solid var(--border);border-radius:12px;
+  background:var(--light);cursor:pointer;transition:all var(--transition)
+}
+.mobile-upload-option:hover{border-color:var(--accent);background:#fff;transform:translateY(-2px)}
+.mobile-upload-icon{font-size:1.8rem;color:var(--accent)}
+.mobile-upload-label{font-size:0.8rem;font-weight:500;color:var(--ink)}
+.mobile-upload-desc{font-size:0.7rem;color:var(--muted);text-align:center}
+.mobile-sheet-overlay{
+  position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.4);
+  display:none;animation:fadeIn 0.15s ease-out
+}
+
+@media (max-width:768px){
+  html{font-size:14px}
+  body{overflow:auto}
+  #app-sidebar{
+    position:fixed;left:-280px;top:0;width:280px;transition:left 0.25s ease-out;
+    box-shadow:4px 0 20px rgba(0,0,0,0.3);z-index:101
+  }
+  #app-sidebar.open{left:0}
+  #sidebar-overlay.open{display:block}
+  #app-main{margin-left:0 !important;width:100%}
+  #menu-toggle{display:block}
+  .topbar{padding:12px 16px}
+  .topbar h2{font-size:1rem}
+  .topbar-actions{gap:6px}
+  .topbar-actions .btn-sm{padding:4px 10px;font-size:0.72rem}
+  .page{padding:16px 16px 32px}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat-card{padding:14px 16px}
+  .stat-value{font-size:1.4rem}
+  .chat-container{max-width:100%;padding-bottom:60px}
+  .chat-messages{gap:12px;padding:12px 0}
+  .msg{max-width:92%;padding:10px 14px;font-size:0.88rem}
+  .chat-input-area{display:none}
+  .chat-input-row{padding:6px 8px}
+  .chat-input-row input{padding:8px 10px;font-size:0.88rem}
+  .chat-tools{flex-wrap:wrap;gap:6px}
+  .chat-tools label{padding:4px 10px;font-size:0.72rem}
+  .doc-item{padding:10px 12px}
+  .doc-title{font-size:0.84rem}
+  .modal{width:95%;padding:20px}
+  .kb-toolbar{flex-direction:column;gap:8px}
+  .search-box{width:100%}
+  #drop-zone{padding:24px 16px}
+  .login-card{width:320px;padding:28px 24px}
+  
+  /* 手机专属界面显示 */
+  .mobile-bottom-nav{display:block;animation:slideUp 0.3s ease-out}
+  .mobile-chat-input{display:block;animation:slideUp 0.3s ease-out 0.1s both}
+  .scroll-to-bottom{bottom:70px}
+  
+  /* 手机界面动画 */
+  @keyframes slideUp{
+    from{transform:translateY(100%);opacity:0}
+    to{transform:translateY(0);opacity:1}
+  }
+  @keyframes fadeIn{
+    from{opacity:0}
+    to{opacity:1}
+  }
+}
+@media (max-width:480px){
+  .stats-grid{grid-template-columns:1fr}
+  .msg{max-width:96%;font-size:0.85rem}
+  .topbar-actions .api-badge{display:none}
+  .topbar{padding:10px 12px}
+}
 </style>
 </head>
 <body>
@@ -329,9 +486,66 @@ body{min-height:100vh;display:flex;overflow:hidden}
   <div class="sidebar-footer">素问新雨 · PBL 案例<br>DeepSeek V4 Pro 驱动</div>
 </aside>
 
+<!-- 移动端侧边栏遮罩 -->
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- 移动端专属底部导航 -->
+<div class="mobile-bottom-nav">
+  <div class="mobile-nav-grid">
+    <button class="mobile-nav-item active" data-mobile-page="dashboard" onclick="switchMobilePage('dashboard')">
+      <span class="mobile-nav-icon">&#9673;</span>
+      <span class="mobile-nav-label">工作台</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="knowledge" onclick="switchMobilePage('knowledge')">
+      <span class="mobile-nav-icon">&#9776;</span>
+      <span class="mobile-nav-label">知识库</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="chat" onclick="switchMobilePage('chat')">
+      <span class="mobile-nav-icon">&#9998;</span>
+      <span class="mobile-nav-label">新雨</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="files" onclick="switchMobilePage('files')">
+      <span class="mobile-nav-icon">&#128193;</span>
+      <span class="mobile-nav-label">文件</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="manage" onclick="switchMobilePage('manage')">
+      <span class="mobile-nav-icon">&#9881;</span>
+      <span class="mobile-nav-label">管理</span>
+    </button>
+  </div>
+</div>
+
+<!-- 移动端聊天输入 -->
+<div class="mobile-chat-input">
+  <div class="mobile-input-row">
+    <button class="mobile-attach-btn" onclick="showMobileUploadSheet()">&#128206;</button>
+    <input type="text" id="mobile-chat-input" placeholder="输入问题..." onkeydown="if(event.key==='Enter')sendMobileMessage()">
+    <button class="mobile-send-btn" onclick="sendMobileMessage()">&#10148;</button>
+  </div>
+</div>
+
+<!-- 移动端文件上传面板 -->
+<div class="mobile-sheet-overlay" id="mobile-sheet-overlay" onclick="closeMobileUploadSheet()"></div>
+<div class="mobile-upload-sheet" id="mobile-upload-sheet">
+  <div class="mobile-upload-title">上传文件</div>
+  <div class="mobile-upload-options">
+    <div class="mobile-upload-option" onclick="handleMobileFileUpload('image')">
+      <span class="mobile-upload-icon">&#128247;</span>
+      <span class="mobile-upload-label">图片</span>
+      <span class="mobile-upload-desc">JPG / PNG / GIF</span>
+    </div>
+    <div class="mobile-upload-option" onclick="handleMobileFileUpload('file')">
+      <span class="mobile-upload-icon">&#128196;</span>
+      <span class="mobile-upload-label">文档</span>
+      <span class="mobile-upload-desc">PDF / Word / TXT</span>
+    </div>
+  </div>
+</div>
+
 <!-- Main Content -->
 <div id="app-main">
   <div class="topbar">
+    <button id="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
     <h2 id="page-title">工作台</h2>
     <div class="topbar-actions">
       <span class="api-badge configured" id="api-status-badge">DeepSeek V4 Pro</span>
@@ -361,7 +575,7 @@ body{min-height:100vh;display:flex;overflow:hidden}
     <div class="kb-toolbar">
       <div class="search-box">
         <span class="search-icon">&#9906;</span>
-        <input type="text" id="kb-search" placeholder="搜索知识库内容..." oninput="renderDocList()">
+        <input type="text" id="kb-search" placeholder="搜索知识库内容..." oninput="debounceSearch()">
       </div>
     </div>
     <div class="category-tabs" id="category-tabs"></div>
@@ -378,6 +592,7 @@ body{min-height:100vh;display:flex;overflow:hidden}
           我可以：基于知识库回答PBL案例问题、识别和分析图片内容、处理文档文件、解读产前筛查指标（NT、AFP、hCG、uE3、InhA）、解答33个PBL提问。
         </div>
       </div>
+      <button class="scroll-to-bottom" id="scroll-bottom-btn" onclick="scrollChatToBottom()" title="回到底部">↓</button>
       <div class="chat-input-area">
         <div id="attachment-preview"></div>
         <div class="chat-input-row">
@@ -410,7 +625,12 @@ body{min-height:100vh;display:flex;overflow:hidden}
   <section class="page" id="page-manage">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <span class="section-title">文档管理</span>
-      <button class="btn btn-primary" onclick="openAddDocModal()">+ 新建文档</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="exportDocs()">导出 JSON</button>
+        <button class="btn btn-outline" onclick="document.getElementById('import-doc-file').click()">导入 JSON</button>
+        <input type="file" id="import-doc-file" accept=".json" style="display:none" onchange="importDocs(this)">
+        <button class="btn btn-primary" onclick="openAddDocModal()">+ 新建文档</button>
+      </div>
     </div>
     <div class="doc-list" id="manage-doc-list"></div>
     <div class="empty-state" id="manage-empty" style="display:none">
@@ -472,6 +692,7 @@ body{min-height:100vh;display:flex;overflow:hidden}
 
 <div id="toast-container"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="knowledge-data.js"></script>
 <script src="app.js"></script>
 </body>
