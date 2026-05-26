@@ -391,17 +391,8 @@ function updateMessageContent(msgDiv, content, sources) {
 async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
   const allDocs = [...PRESET_DOCS, ...userDocs];
   
-  // 构建知识库上下文
-  let knowledgeContext = '';
-  if (query) {
-    const relevantDocs = findRelevantDocs(query, allDocs, 2);
-    relevantDocs.forEach(doc => {
-      knowledgeContext += '\n--- 文档：' + doc.title + ' ---\n' + doc.content.substring(0, 3000) + '\n';
-    });
-  } else {
-    // 没有文本查询时，附上全部知识库摘要
-    knowledgeContext = allDocs.map(d => '文档：' + d.title + '\n' + d.content.substring(0, 500)).join('\n---\n');
-  }
+  // 构建知识库上下文：注入全部知识库文档，让AI拥有完整知识
+  let knowledgeContext = allDocs.map(d => '--- 文档：' + d.title + ' ---\n' + d.content).join('\n\n');
   
   const systemPrompt = '你是「新雨」，素问新雨小组的临床思维AI助手。请简洁、专业地回答问题，像DeepSeek网页版那样直接给出核心信息，避免冗长嵌套列表。优先基于知识库，无答案时联网搜索。\n\n知识库：\n' + knowledgeContext;
   
@@ -465,8 +456,9 @@ async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
   // 记录 AI 回复到对话历史
   chatHistory.push({ role: 'assistant', content: content });
   
-  const relevantDocs = query ? findRelevantDocs(query, allDocs, 2) : [];
-  updateMessageContent(loadingMsg, content, relevantDocs.map(d => ({ id: d.id, title: d.title })));
+  // 引用来源：展示所有知识库文档（因为AI已获得全部知识库）
+  const referencedDocs = query ? findRelevantDocs(query, allDocs, 5) : [];
+  updateMessageContent(loadingMsg, content, referencedDocs.map(d => ({ id: d.id, title: d.title })));
 }
 
 function findRelevantDocs(query, allDocs, topN) {
