@@ -6,10 +6,13 @@
 <title>素问新雨 — 临床思维知识库</title>
 <style>
 :root {
-  --ink: #1a1d23; --paper: #f7f5f0; --surface: #fefdfa;
-  --accent: #2b5f8a; --warm: #b8573a; --muted: #6b6d72;
-  --border: #e2ded7; --light: #f0ede7; --sidebar-w: 260px;
-  --radius: 8px; --transition: 0.18s ease-out;
+  --ink: #1a1d23; --paper: #f8f9fa; --surface: #ffffff;
+  --accent: #2563eb; --warm: #dc2626; --muted: #6b7280;
+  --border: #e5e7eb; --light: #f3f4f6; --sidebar-w: 260px;
+  --radius: 10px; --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans",Helvetica,Arial,sans-serif;font-size:15px;color:var(--ink);background:var(--paper);line-height:1.5;scroll-behavior:smooth}
@@ -42,12 +45,14 @@ body{min-height:100vh;display:flex;overflow:hidden}
 /* ===== 侧边栏 ===== */
 #app-sidebar{
   width:var(--sidebar-w);height:100vh;position:fixed;left:0;top:0;
-  background:#1c1f26;color:#e6e4df;display:flex;flex-direction:column;
+  background:linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color:#e2e8f0;display:flex;flex-direction:column;
   padding:28px 0;z-index:100;overflow-y:auto;display:none;
+  box-shadow:var(--shadow-lg);
 }
-.sidebar-brand{padding:0 24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px}
-.sidebar-brand h1{font-size:1.25rem;font-weight:700;letter-spacing:0.02em;color:#f5f3ee}
-.sidebar-brand p{font-size:0.72rem;color:#8a8d94;margin-top:4px;letter-spacing:0.06em;text-transform:uppercase}
+.sidebar-brand{padding:0 24px 32px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:12px}
+.sidebar-brand h1{font-size:1.3rem;font-weight:700;letter-spacing:0.02em;color:#f8fafc;background:linear-gradient(90deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-brand p{font-size:0.72rem;color:#94a3b8;margin-top:4px;letter-spacing:0.06em;text-transform:uppercase;font-weight:500}
 .sidebar-nav{flex:1;padding:8px 12px}
 .nav-item{
   display:flex;align-items:center;gap:12px;padding:11px 16px;
@@ -90,10 +95,17 @@ body{min-height:100vh;display:flex;overflow:hidden}
 #page-chat.active{display:flex;flex-direction:column;overflow:hidden;padding:20px 32px 0}
 
 /* ===== 仪表盘卡片 ===== */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-bottom:32px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:32px}
 .stat-card{
   background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.04)
+  border-radius:var(--radius);padding:22px 24px;
+  box-shadow:var(--shadow-sm);transition:all var(--transition);
+  position:relative;overflow:hidden
+}
+.stat-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;width:4px;height:100%;
+  background:var(--accent);border-radius:4px 0 0 4px
 }
 .stat-label{font-size:0.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
 .stat-value{font-size:1.8rem;font-weight:700;line-height:1.15}
@@ -173,9 +185,28 @@ body{min-height:100vh;display:flex;overflow:hidden}
 .scroll-to-bottom:hover{opacity:1;transform:translateX(-50%) translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.2)}
 .scroll-to-bottom.visible{display:flex}
 
-.msg{max-width:85%;padding:12px 16px;border-radius:var(--radius);font-size:0.9rem;line-height:1.6;animation:msgSlideIn 0.25s ease-out}
-.msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-radius:var(--radius) var(--radius) 4px var(--radius);animation:msgSlideInRight 0.25s ease-out}
-.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius) var(--radius) var(--radius) 4px;animation:msgSlideInLeft 0.25s ease-out;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.msg{
+  max-width:85%;padding:14px 18px;border-radius:var(--radius);
+  font-size:0.92rem;line-height:1.65;animation:msgSlideIn 0.3s cubic-bezier(0.4,0,0.2,1);
+  position:relative;word-wrap:break-word
+}
+.msg.user{
+  align-self:flex-end;background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+  color:#fff;border-radius:18px 18px 6px 18px;
+  animation:msgSlideInRight 0.3s cubic-bezier(0.4,0,0.2,1);
+  box-shadow:0 2px 8px rgba(59,130,246,0.2)
+}
+.msg.ai{
+  align-self:flex-start;background:var(--surface);border:1px solid var(--border);
+  border-radius:18px 18px 18px 6px;animation:msgSlideInLeft 0.3s cubic-bezier(0.4,0,0.2,1);
+  box-shadow:var(--shadow-sm)
+}
+.msg.ai::before{
+  content:'';position:absolute;top:0;left:-8px;width:16px;height:16px;
+  background:var(--surface);border-left:1px solid var(--border);
+  border-bottom:1px solid var(--border);transform:rotate(45deg);
+  border-radius:2px 0 0 0
+}
 @keyframes msgSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes msgSlideInRight{from{opacity:0;transform:translateX(16px) scale(0.95)}to{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes msgSlideInLeft{from{opacity:0;transform:translateX(-16px) scale(0.95)}to{opacity:1;transform:translateX(0) scale(1)}}
@@ -304,6 +335,90 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
   display:flex;align-items:center;justify-content:center;cursor:pointer
 }
 .image-preview-modal img{max-width:90vw;max-height:90vh;border-radius:4px;object-fit:contain}
+
+/* ===== 文档管理界面 ===== */
+.manage-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:24px;flex-wrap:wrap;gap:12px
+}
+.manage-actions{display:flex;gap:16px;flex-wrap:wrap}
+.action-group{display:flex;gap:8px}
+.action-icon{margin-right:6px;font-size:0.9em}
+
+.manage-toolbar{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:20px;flex-wrap:wrap;gap:12px
+}
+.toolbar-actions{display:flex;gap:8px;align-items:center}
+.toolbar-actions select{
+  padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--surface);font-size:0.84rem;color:var(--ink)
+}
+
+.manage-doc-list{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden
+}
+.list-header{
+  display:grid;grid-template-columns:40px 1fr 120px 80px 140px 100px;
+  background:var(--light);padding:12px 16px;font-size:0.74rem;
+  color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;
+  border-bottom:1px solid var(--border)
+}
+.list-body{max-height:500px;overflow-y:auto}
+.doc-row{
+  display:grid;grid-template-columns:40px 1fr 120px 80px 140px 100px;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  align-items:center;transition:background var(--transition)
+}
+.doc-row:hover{background:var(--light)}
+.doc-row.selected{background:#f0f7ff}
+.header-checkbox,.doc-checkbox{display:flex;align-items:center;justify-content:center}
+.header-title,.doc-title{font-weight:500;font-size:0.9rem}
+.doc-title a{color:var(--ink);text-decoration:none}
+.doc-title a:hover{color:var(--accent)}
+.header-category,.doc-category{
+  font-size:0.8rem;padding:4px 10px;border-radius:12px;
+  background:var(--light);color:var(--muted);text-align:center
+}
+.header-size,.doc-size{font-size:0.8rem;color:var(--muted)}
+.header-date,.doc-date{font-size:0.8rem;color:var(--muted)}
+.header-actions,.doc-actions{display:flex;gap:4px}
+.doc-actions button{
+  padding:4px 8px;font-size:0.72rem;border-radius:4px
+}
+
+/* 快速上传弹窗 */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:40px 20px;text-align:center;cursor:pointer;
+  transition:all var(--transition);margin-bottom:20px
+}
+.upload-zone:hover{border-color:var(--accent);background:var(--light)}
+.upload-icon{font-size:2.5rem;color:var(--muted);margin-bottom:12px}
+.upload-options{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.option-group label{display:block;font-size:0.84rem;margin-bottom:6px;color:var(--ink)}
+.option-group select,.option-group input{
+  width:100%;padding:8px 12px;border:1px solid var(--border);
+  border-radius:var(--radius);font-size:0.84rem
+}
+.upload-progress{margin-bottom:20px}
+.progress-bar{
+  height:6px;background:var(--light);border-radius:3px;
+  overflow:hidden;margin-bottom:8px
+}
+.progress-fill{
+  height:100%;background:var(--accent);width:0%;
+  transition:width 0.3s ease-out
+}
+.progress-text{font-size:0.8rem;color:var(--muted);text-align:center}
+
+/* 移动端适配 */
+@media (max-width:768px){
+  .manage-toolbar{flex-direction:column;align-items:stretch}
+  .list-header,.doc-row{grid-template-columns:40px 1fr 100px}
+  .header-size,.header-date,.doc-size,.doc-date{display:none}
+}
 
 /* ===== 移动端专属底部导航 ===== */
 .mobile-bottom-nav{
@@ -623,20 +738,74 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
 
   <!-- Manage -->
   <section class="page" id="page-manage">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div class="manage-header">
       <span class="section-title">文档管理</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-outline" onclick="exportDocs()">导出 JSON</button>
-        <button class="btn btn-outline" onclick="document.getElementById('import-doc-file').click()">导入 JSON</button>
-        <input type="file" id="import-doc-file" accept=".json" style="display:none" onchange="importDocs(this)">
-        <button class="btn btn-primary" onclick="openAddDocModal()">+ 新建文档</button>
+      <div class="manage-actions">
+        <div class="action-group">
+          <button class="btn btn-outline" onclick="exportDocs()" title="导出所有文档">
+            <span class="action-icon">&#128190;</span> 导出 JSON
+          </button>
+          <button class="btn btn-outline" onclick="document.getElementById('import-doc-file').click()" title="导入文档">
+            <span class="action-icon">&#128229;</span> 导入 JSON
+          </button>
+          <input type="file" id="import-doc-file" accept=".json" style="display:none" onchange="importDocs(this)">
+        </div>
+        <div class="action-group">
+          <button class="btn btn-outline" onclick="openQuickUploadModal()" title="快速上传文件">
+            <span class="action-icon">&#128206;</span> 上传文件
+          </button>
+          <button class="btn btn-primary" onclick="openAddDocModal()">
+            <span class="action-icon">&#65291;</span> 新建文档
+          </button>
+        </div>
       </div>
     </div>
-    <div class="doc-list" id="manage-doc-list"></div>
+    
+    <!-- 文档管理工具条 -->
+    <div class="manage-toolbar">
+      <div class="search-box">
+        <span class="search-icon">&#9906;</span>
+        <input type="text" id="manage-search" placeholder="搜索文档..." oninput="debounceManageSearch()">
+      </div>
+      <div class="toolbar-actions">
+        <select id="category-filter" onchange="filterManageDocs()">
+          <option value="">全部分类</option>
+          <option value="病例摘要">病例摘要</option>
+          <option value="提问整理">提问整理</option>
+          <option value="基础医学">基础医学</option>
+          <option value="临床诊断">临床诊断</option>
+          <option value="产前筛查">产前筛查</option>
+          <option value="遗传咨询">遗传咨询</option>
+          <option value="自定义">自定义</option>
+        </select>
+        <button class="btn btn-outline" onclick="batchDeleteDocs()" id="batch-delete-btn" disabled>
+          <span class="action-icon">&#128465;</span> 批量删除
+        </button>
+      </div>
+    </div>
+    
+    <!-- 文档列表 -->
+    <div class="manage-doc-list" id="manage-doc-list">
+      <div class="list-header">
+        <div class="header-checkbox">
+          <input type="checkbox" id="select-all-docs" onchange="toggleSelectAllDocs()">
+        </div>
+        <div class="header-title">文档标题</div>
+        <div class="header-category">分类</div>
+        <div class="header-size">大小</div>
+        <div class="header-date">创建时间</div>
+        <div class="header-actions">操作</div>
+      </div>
+      <div class="list-body" id="manage-doc-list-body"></div>
+    </div>
+    
     <div class="empty-state" id="manage-empty" style="display:none">
       <div class="empty-icon">&#128196;</div>
       <h3>暂无文档</h3>
-      <p>点击上方按钮添加知识库文档</p>
+      <p>点击上方按钮添加知识库文档，或上传文件自动创建</p>
+      <button class="btn btn-primary" onclick="openQuickUploadModal()" style="margin-top:16px">
+        <span class="action-icon">&#128206;</span> 快速上传文件
+      </button>
     </div>
   </section>
 </div>
@@ -660,6 +829,60 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeDocModal()">取消</button>
       <button class="btn btn-primary" onclick="saveDoc()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Upload Modal -->
+<div class="modal-overlay" id="quick-upload-modal" style="display:none" onclick="if(event.target===this)closeQuickUploadModal()">
+  <div class="modal" style="max-width:500px">
+    <h3>快速上传文件到知识库</h3>
+    <p style="font-size:0.84rem;color:var(--muted);margin-bottom:20px">上传文件将自动提取内容并创建为知识库文档</p>
+    
+    <div class="upload-zone" id="quick-upload-zone" onclick="document.getElementById('quick-upload-input').click()">
+      <div class="upload-icon">&#128206;</div>
+      <p>拖拽文件到此处，或点击上传</p>
+      <p style="font-size:0.72rem;color:var(--muted);margin-top:4px">支持：图片（JPG/PNG/GIF）、文档（PDF/Word/Excel/TXT/MD）</p>
+      <input type="file" id="quick-upload-input" accept="image/*,.pdf,.doc,.docx,.txt,.md,.xlsx,.pptx" multiple style="display:none" onchange="handleQuickUpload(this.files)">
+    </div>
+    
+    <div class="upload-options">
+      <div class="option-group">
+        <label>文档分类</label>
+        <select id="upload-category">
+          <option value="病例摘要">病例摘要</option>
+          <option value="提问整理">提问整理</option>
+          <option value="基础医学">基础医学</option>
+          <option value="临床诊断">临床诊断</option>
+          <option value="产前筛查">产前筛查</option>
+          <option value="遗传咨询">遗传咨询</option>
+          <option value="自定义">自定义</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>标题生成规则</label>
+        <select id="title-rule">
+          <option value="filename">使用文件名</option>
+          <option value="auto">自动提取标题</option>
+          <option value="custom">自定义标题</option>
+        </select>
+      </div>
+      <div class="option-group" id="custom-title-group" style="display:none">
+        <label>自定义标题</label>
+        <input type="text" id="custom-doc-title" placeholder="输入文档标题">
+      </div>
+    </div>
+    
+    <div class="upload-progress" id="upload-progress" style="display:none">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-text" id="progress-text">处理中...</div>
+    </div>
+    
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeQuickUploadModal()">取消</button>
+      <button class="btn btn-primary" onclick="processUploadedFiles()" id="process-upload-btn">开始处理</button>
     </div>
   </div>
 </div>

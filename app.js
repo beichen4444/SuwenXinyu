@@ -494,17 +494,217 @@ function deleteDoc(docId) {
 }
 
 function renderManageList() {
-  const container = document.getElementById('manage-doc-list');
+  const container = document.getElementById('manage-doc-list-body');
+  const listContainer = document.getElementById('manage-doc-list');
   const empty = document.getElementById('manage-empty');
-  if (userDocs.length === 0) { container.style.display = 'none'; empty.style.display = 'block'; return; }
-  empty.style.display = 'none'; container.style.display = 'block';
-  container.innerHTML = userDocs.map(doc =>
-    '<div class="doc-item"><div class="doc-icon">&#128221;</div>' +
-    '<div class="doc-info"><div class="doc-title">' + doc.title + '</div>' +
-    '<div class="doc-meta">' + doc.category + ' · ' + doc.createdAt + '</div></div>' +
-    '<div class="doc-actions"><button onclick="editDoc(\'' + doc.id + '\', event)">编辑</button>' +
-    '<button onclick="deleteDoc(\'' + doc.id + '\')" style="color:#b8573a">删除</button></div></div>'
+  
+  if (userDocs.length === 0) { 
+    listContainer.style.display = 'none'; 
+    empty.style.display = 'block'; 
+    return; 
+  }
+  
+  empty.style.display = 'none'; 
+  listContainer.style.display = 'block';
+  
+  container.innerHTML = userDocs.map(doc => `
+    <div class="doc-row" data-doc-id="${doc.id}">
+      <div class="doc-checkbox">
+        <input type="checkbox" class="doc-select" onchange="updateBatchDeleteBtn()">
+      </div>
+      <div class="doc-title">
+        <a href="javascript:void(0)" onclick="viewDoc('${doc.id}', event)">${doc.title}</a>
+      </div>
+      <div class="doc-category">${doc.category}</div>
+      <div class="doc-size">${Math.ceil(doc.content.length / 1024)} KB</div>
+      <div class="doc-date">${doc.createdAt}</div>
+      <div class="doc-actions">
+        <button class="btn btn-outline btn-sm" onclick="viewDoc('${doc.id}', event)" title="查看">👁️</button>
+        <button class="btn btn-outline btn-sm" onclick="editDoc('${doc.id}', event)" title="编辑">✏️</button>
+        <button class="btn btn-outline btn-sm" onclick="sendDocToChat('${doc.id}')" title="发送到聊天">💬</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteDoc('${doc.id}')" title="删除" style="color:var(--warm)">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ===== 文档管理增强功能 ===== */
+let selectedDocIds = new Set();
+
+function toggleSelectAllDocs() {
+  const selectAll = document.getElementById('select-all-docs').checked;
+  document.querySelectorAll('.doc-select').forEach(cb => cb.checked = selectAll);
+  updateBatchDeleteBtn();
+}
+
+function updateBatchDeleteBtn() {
+  const selected = document.querySelectorAll('.doc-select:checked').length;
+  const btn = document.getElementById('batch-delete-btn');
+  btn.disabled = selected === 0;
+  btn.innerHTML = `<span class="action-icon">&#128465;</span> 批量删除 (${selected})`;
+}
+
+function batchDeleteDocs() {
+  const selected = Array.from(document.querySelectorAll('.doc-select:checked'))
+    .map(cb => cb.closest('.doc-row').dataset.docId);
+  
+  if (selected.length === 0) return;
+  if (!confirm(`确定删除选中的 ${selected.length} 个文档？`)) return;
+  
+  userDocs = userDocs.filter(d => !selected.includes(d.id));
+  localStorage.setItem('clinicalkb_user_docs', JSON.stringify(userDocs));
+  renderDocList();
+  renderManageList();
+  updateStats();
+  showToast(`已删除 ${selected.length} 个文档`);
+}
+
+function filterManageDocs() {
+  const category = document.getElementById('category-filter').value;
+  const search = document.getElementById('manage-search').value.toLowerCase();
+  
+  document.querySelectorAll('.doc-row').forEach(row => {
+    const docId = row.dataset.docId;
+    const doc = userDocs.find(d => d.id === docId);
+    if (!doc) return;
+    
+    const matchCategory = !category || doc.category === category;
+    const matchSearch = !search || 
+      doc.title.toLowerCase().includes(search) || 
+      doc.content.toLowerCase().includes(search);
+    
+    row.style.display = matchCategory && matchSearch ? 'grid' : 'none';
+  });
+}
+
+function debounceManageSearch() {
+  clearTimeout(window.manageSearchTimer);
+  window.manageSearchTimer = setTimeout(filterManageDocs, 300);
+}
+
+function openQuickUploadModal() {
+  document.getElementById('quick-upload-modal').style.display = 'flex';
+  document.getElementById('upload-progress').style.display = 'none';
+  document.getElementById('process-upload-btn').disabled = false;
+  document.getElementById('quick-upload-input').value = '';
+  uploadedFiles = [];
+  document.getElementById('quick-upload-zone').innerHTML = `
+    <div class="upload-icon">&#128206;</div>
+    <p>拖拽文件到此处，或点击上传</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:4px">支持：图片（JPG/PNG/GIF）、文档（PDF/Word/Excel/TXT/MD）</p>
+    <input type="file" id="quick-upload-input" accept="image/*,.pdf,.doc,.docx,.txt,.md,.xlsx,.pptx" multiple style="display:none" onchange="handleQuickUpload(this.files)">
+  `;
+  
+  // 标题规则监听
+  document.getElementById('title-rule').addEventListener('change', function() {
+    document.getElementById('custom-title-group').style.display = this.value === 'custom' ? 'block' : 'none';
+  });
+}
+
+function closeQuickUploadModal() {
+  document.getElementById('quick-upload-modal').style.display = 'none';
+  document.getElementById('quick-upload-input').value = '';
+}
+
+let uploadedFiles = [];
+
+function handleQuickUpload(files) {
+  uploadedFiles = Array.from(files);
+  const zone = document.getElementById('quick-upload-zone');
+  const fileList = uploadedFiles.map(f => 
+    `<div class="file-chip">${f.type.startsWith('image/') ? '🖼️' : '📄'} ${f.name}</div>`
   ).join('');
+  zone.innerHTML = `
+    <div class="upload-icon">&#128206;</div>
+    <p>已选择 ${uploadedFiles.length} 个文件</p>
+    <div style="margin-top:12px;font-size:0.8rem;color:var(--muted)">${fileList}</div>
+  `;
+}
+
+function processUploadedFiles() {
+  if (uploadedFiles.length === 0) {
+    showToast('请先选择文件', 'error');
+    return;
+  }
+  
+  const category = document.getElementById('upload-category').value;
+  const titleRule = document.getElementById('title-rule').value;
+  const customTitle = document.getElementById('custom-doc-title').value;
+  
+  document.getElementById('process-upload-btn').disabled = true;
+  document.getElementById('upload-progress').style.display = 'block';
+  
+  processFilesSequentially(uploadedFiles, category, titleRule, customTitle);
+}
+
+async function processFilesSequentially(files, category, titleRule, customTitle) {
+  const progressFill = document.getElementById('progress-fill');
+  const progressText = document.getElementById('progress-text');
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const progress = ((i + 1) / files.length) * 100;
+    progressFill.style.width = `${progress}%`;
+    progressText.textContent = `处理中: ${i + 1}/${files.length} (${file.name})`;
+    
+    try {
+      let title = '';
+      if (titleRule === 'filename') {
+        title = file.name.replace(/\.[^/.]+$/, ''); // 移除扩展名
+      } else if (titleRule === 'custom' && customTitle) {
+        title = customTitle + (files.length > 1 ? ` ${i + 1}` : '');
+      } else {
+        title = `上传文档 ${i + 1}`;
+      }
+      
+      let content = '';
+      if (file.type.startsWith('image/')) {
+        const b64 = await fileToBase64(file);
+        content = `![${file.name}](${b64})\n\n*图片上传于 ${new Date().toLocaleString()}*`;
+      } else {
+        content = await readFileContent(file);
+      }
+      
+      userDocs.push({
+        id: 'upload-' + Date.now() + '-' + i,
+        title: title,
+        category: category,
+        content: content,
+        createdAt: new Date().toISOString().split('T')[0]
+      });
+      
+    } catch (err) {
+      console.error('处理文件失败:', file.name, err);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 100)); // 小延迟避免UI卡顿
+  }
+  
+  // 保存并更新
+  localStorage.setItem('clinicalkb_user_docs', JSON.stringify(userDocs));
+  renderDocList();
+  renderManageList();
+  updateStats();
+  
+  progressText.textContent = `完成！已添加 ${files.length} 个文档到知识库`;
+  setTimeout(() => {
+    closeQuickUploadModal();
+    showToast(`成功添加 ${files.length} 个文档到知识库`);
+  }, 1000);
+}
+
+function sendDocToChat(docId) {
+  const doc = userDocs.find(d => d.id === docId) || PRESET_DOCS.find(d => d.id === docId);
+  if (!doc) return;
+  
+  switchPage('chat');
+  const input = document.getElementById('chat-input');
+  input.value = `请分析以下文档：\n\n[文档标题：${doc.title}]\n[分类：${doc.category}]\n\n${doc.content.substring(0, 2000)}${doc.content.length > 2000 ? '...' : ''}`;
+  input.focus();
+  
+  // 移动端同步
+  const mobileInput = document.getElementById('mobile-chat-input');
+  if (mobileInput) mobileInput.value = `请分析文档：${doc.title}`;
 }
 
 function exportDocs() {
