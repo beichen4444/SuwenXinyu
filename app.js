@@ -1,4 +1,4 @@
-/* 素问新雨 - 临床思维知识库 主逻辑 */
+﻿/* 素问新雨 - 临床思维知识库 主逻辑 */
 /* ===== 登录系统 ===== */
 // 密码哈希：1133 的 SHA-256 值（前端计算比对）
 const PASSWORD_HASH = '7a99d42d79e9bafeaa5ccedaf0135267da4ccd197a99131a8cf15025cb54ab18';
@@ -154,17 +154,26 @@ function setupChatScroll() {
   const messagesDiv = document.getElementById('chat-messages');
   if (!messagesDiv) return;
   const scrollBtn = document.getElementById('scroll-bottom-btn');
-  if (!scrollBtn) return;
-
+  
+  // 恢复正常滚动
+  messagesDiv.style.overflowY = 'auto';
+  messagesDiv.style.touchAction = 'auto';
+  messagesDiv.style.userSelect = 'auto';
+  
   // 监听滚动：距底部超过 200px 时显示回到底部按钮
   messagesDiv.addEventListener('scroll', function() {
     const distToBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop - messagesDiv.clientHeight;
-    if (distToBottom > 200) {
-      scrollBtn.classList.add('visible');
-    } else {
-      scrollBtn.classList.remove('visible');
+    if (scrollBtn) {
+      if (distToBottom > 200) {
+        scrollBtn.classList.add('visible');
+      } else {
+        scrollBtn.classList.remove('visible');
+      }
     }
-  });
+  }, { passive: true });
+  
+  // 初始滚动到底部
+  forceScrollToBottom();
 }
 
 /* ===== 手机专属界面 ===== */
@@ -224,11 +233,28 @@ function handleMobileFileUpload(type) {
     const files = e.target.files;
     if (!files.length) return;
     
+    // 询问是否存入知识库
+    const shouldSave = confirm('是否将这些文件存入知识库？');
+    let category = '病例摘要';
+    if (shouldSave) {
+      category = prompt('选择分类：\n1. 病例摘要\n2. 提问整理\n3. 基础医学\n4. 临床诊断\n5. 产前筛查\n6. 遗传咨询\n7. 自定义', '病例摘要') || '病例摘要';
+    }
+    
     // 切换到聊天页面
     switchMobilePage('chat');
     
     // 处理文件
     for (const file of files) {
+      if (shouldSave) {
+        try {
+          await addFileToKnowledgeBase(file, category);
+          showToast(`已添加 ${file.name} 到知识库`);
+        } catch (error) {
+          showToast(`添加 ${file.name} 失败: ${error.message}`, 'error');
+        }
+      }
+      
+      // 同时添加到聊天附件
       if (type === 'image') {
         const b64 = await fileToBase64(file);
         const fileObj = dataURLtoFile(b64, file.name);
@@ -276,6 +302,49 @@ function initMobileUI() {
     const mobileInput = document.querySelector('.mobile-chat-input');
     if (mobileNav) mobileNav.style.display = 'block';
     if (mobileInput) mobileInput.style.display = 'block';
+    
+    // 初始化键盘适配
+    initKeyboardAdaptation();
+  }
+}
+
+// 移动端键盘适配
+function initKeyboardAdaptation() {
+  const mobileInputEl = document.querySelector('.mobile-chat-input');
+  if (!mobileInputEl) return;
+  
+  const origView = window.visualViewport;
+  if (!origView) return;
+  
+  const adjustLayout = () => {
+    const viewH = origView.height;
+    const winH = window.innerHeight;
+    const keyboardH = Math.max(0, winH - viewH);
+    
+    if (keyboardH > 100) {
+      document.documentElement.style.setProperty('--keyboard-height', keyboardH + 'px');
+      mobileInputEl.classList.add('keyboard-up');
+      document.body.classList.add('keyboard-open');
+      // 滚动到底部确保光标可见
+      const msgContainer = document.getElementById('chat-messages');
+      if (msgContainer) {
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+      }
+    } else {
+      document.documentElement.style.setProperty('--keyboard-height', '0px');
+      mobileInputEl.classList.remove('keyboard-up');
+      document.body.classList.remove('keyboard-open');
+    }
+  };
+  
+  origView.addEventListener('resize', adjustLayout);
+  origView.addEventListener('scroll', adjustLayout);
+  
+  // 输入框focus时触发
+  const mobileInputField = document.getElementById('mobile-chat-input');
+  if (mobileInputField) {
+    mobileInputField.addEventListener('focus', () => setTimeout(adjustLayout, 350));
+    mobileInputField.addEventListener('blur', () => setTimeout(adjustLayout, 350));
   }
 }
 
@@ -761,13 +830,26 @@ function updateStats() {
 }
 
 /* ===== AI 聊天 ===== */
-function handleFileAttach(input, type) {
+async function handleFileAttach(input, type) {
   if (!input.files.length) return;
-  Array.from(input.files).forEach(file => {
-    if (type === 'image' && !file.type.startsWith('image/')) { showToast('请选择图片文件', 'error'); return; }
-    if (attachedFiles.length >= 5) { showToast('最多上传5个文件', 'error'); return; }
+  
+  for (const file of Array.from(input.files)) {
+    if (type === 'image' && !file.type.startsWith('image/')) { showToast('请选择图片文件', 'error'); continue; }
+    if (attachedFiles.length >= 5) { showToast('最多上传5个文件', 'error'); break; }
+    
     attachedFiles.push(file);
-  });
+    
+    // 如果开启了知识库同步，自动添加到知识库
+    if (kbSyncEnabled) {
+      try {
+        await addFileToKnowledgeBase(file, '病例摘要');
+        showToast(`已添加 ${file.name} 到知识库`, 'success');
+      } catch (error) {
+        showToast(`添加 ${file.name} 到知识库失败: ${error.message}`, 'error');
+      }
+    }
+  }
+  
   renderAttachments();
   input.value = '';
 }
@@ -831,10 +913,26 @@ async function sendMessage() {
     if (apiConfig.provider !== 'local' && apiConfig.key && apiConfig.key.length > 10) {
       await callExternalAI(message, imageBases, fileContents, loadingMsg);
     } else {
-      const response = generateAIResponse(message);
-      chatHistory.push({ role: 'assistant', content: response.content });
+      // 使用增强的AI响应，支持文档生成
+      const enhancedResponse = generateEnhancedAIResponse(message);
+      chatHistory.push({ role: 'assistant', content: enhancedResponse.content });
       saveChatHistory();
-      updateMessageContent(loadingMsg, response.content, response.sources);
+      updateMessageContent(loadingMsg, enhancedResponse.content, enhancedResponse.sources || []);
+      
+      // 如果需要生成文档，自动下载
+      if (enhancedResponse.shouldGenerateDoc) {
+        setTimeout(async () => {
+          try {
+            await generateDocument(
+              enhancedResponse.docContent, 
+              enhancedResponse.docFormat, 
+              enhancedResponse.docTitle
+            );
+          } catch (e) {
+            console.error('文档生成失败:', e);
+          }
+        }, 500);
+      }
     }
   } catch (e) {
     updateMessageContent(loadingMsg, '请求失败：' + e.message + '。已切换到本地检索。', []);
@@ -872,6 +970,24 @@ function previewImage(dataUrl) {
   document.body.appendChild(div);
 }
 
+// 强制聊天区域滚动到底部
+function forceScrollToBottom() {
+  const messagesDiv = document.getElementById('chat-messages');
+  if (!messagesDiv) return;
+  
+  // 立即滚动
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  
+  // 确保滚动完成
+  setTimeout(() => {
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }, 10);
+  
+  // 隐藏回到底部按钮
+  const scrollBtn = document.getElementById('scroll-bottom-btn');
+  if (scrollBtn) scrollBtn.classList.remove('visible');
+}
+
 function addMessage(role, content, sources) {
   const messagesDiv = document.getElementById('chat-messages');
   const msgDiv = document.createElement('div');
@@ -885,12 +1001,10 @@ function addMessage(role, content, sources) {
   }
   msgDiv.innerHTML = content + srcHTML;
   messagesDiv.appendChild(msgDiv);
-  setTimeout(() => {
-    messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-    // 隐藏回到底部按钮
-    const scrollBtn = document.getElementById('scroll-bottom-btn');
-    if (scrollBtn) scrollBtn.classList.remove('visible');
-  }, 50);
+  
+  // 强制滚动到底部
+  forceScrollToBottom();
+  
   return msgDiv;
 }
 
@@ -903,12 +1017,9 @@ function updateMessageContent(msgDiv, content, sources) {
   }
   // 通过 markdownToHTML 渲染后再设置，避免显示原始 ** ### | 等符号
   msgDiv.innerHTML = markdownToHTML(content) + srcHTML;
-  const messagesDiv = document.getElementById('chat-messages');
-  setTimeout(() => {
-    messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-    const scrollBtn = document.getElementById('scroll-bottom-btn');
-    if (scrollBtn) scrollBtn.classList.remove('visible');
-  }, 50);
+  
+  // 强制滚动到底部
+  forceScrollToBottom();
 }
 
 async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
@@ -989,6 +1100,22 @@ async function callExternalAI(query, imageBases, fileContents, loadingMsg) {
   // 引用来源：展示所有知识库文档（因为AI已获得全部知识库）
   const referencedDocs = query ? findRelevantDocs(query, allDocs, 5) : [];
   updateMessageContent(loadingMsg, content, referencedDocs.map(d => ({ id: d.id, title: d.title })));
+  
+  // 检测文档生成指令
+  const docDetection = detectDocumentGeneration(query);
+  if (docDetection) {
+    setTimeout(async () => {
+      try {
+        await generateDocument(
+          content, 
+          docDetection.format, 
+          docDetection.title
+        );
+      } catch (e) {
+        console.error('文档生成失败:', e);
+      }
+    }, 500);
+  }
   
   // 检查回复中是否包含沙箱工具调用
   await processSandboxCalls(content, loadingMsg);
@@ -1134,6 +1261,8 @@ async function handleFileDrop(files) {
   const results = document.getElementById('file-results');
   results.innerHTML = '<div style="padding:16px;color:var(--muted)"><em>正在分析 ' + files.length + ' 个文件...</em></div>';
   
+  let kbAddedCount = 0;
+  
   for (const file of Array.from(files)) {
     const card = document.createElement('div');
     card.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px';
@@ -1154,18 +1283,55 @@ async function handleFileDrop(files) {
           '<div><strong>' + file.name + '</strong><div style="font-size:0.78rem;color:var(--muted)">' + (file.size/1024).toFixed(1) + 'KB</div></div></div>' +
           '<img src="' + b64 + '" style="max-width:100%;max-height:300px;border-radius:4px;margin-bottom:12px;cursor:pointer" onclick="previewImage(\'' + b64 + '\')">' +
           '<div style="font-size:0.82rem;color:var(--muted)">图片已加载，可复制到「新雨AI」对话框发送分析请求</div>' +
-          '<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="sendFileToChat(\'' + b64 + '\',\'' + file.name + '\',true)">发送给新雨分析</button>';
+          '<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="sendFileToChat(\'' + b64 + '\',\'' + file.name + '\',true)">发送给新雨分析</button>' +
+          '<button class="btn btn-sm btn-outline" style="margin-top:8px;margin-left:8px" onclick="addFileToKbFromDrop(\'' + b64 + '\',\'' + file.name + '\',true)">添加到知识库</button>';
       } else {
         const text = await readFileContent(file);
         card.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
           '<div style="font-size:1.5rem">&#128196;</div>' +
           '<div><strong>' + file.name + '</strong><div style="font-size:0.78rem;color:var(--muted)">' + (file.size/1024).toFixed(1) + 'KB</div></div></div>' +
           '<div style="background:var(--light);padding:12px;border-radius:4px;font-size:0.82rem;max-height:200px;overflow-y:auto;white-space:pre-wrap;margin-bottom:8px">' + text.substring(0, 1000) + (text.length > 1000 ? '...' : '') + '</div>' +
-          '<button class="btn btn-sm btn-primary" onclick="sendFileToChat(\'' + encodeURIComponent(text.substring(0,3000)) + '\',\'' + file.name + '\',false)">发送给新雨分析</button>';
+          '<button class="btn btn-sm btn-primary" onclick="sendFileToChat(\'' + encodeURIComponent(text.substring(0,3000)) + '\',\'' + file.name + '\',false)">发送给新雨分析</button>' +
+          '<button class="btn btn-sm btn-outline" style="margin-left:8px" onclick="addFileToKbFromDrop(\'' + encodeURIComponent(text.substring(0,3000)) + '\',\'' + file.name + '\',false)">添加到知识库</button>';
+      }
+      
+      // 如果开启了文件处理中心的知识库同步
+      if (filesKbSyncEnabled) {
+        try {
+          const category = document.getElementById('files-category-select')?.value || '病例摘要';
+          await addFileToKnowledgeBase(file, category);
+          kbAddedCount++;
+        } catch (error) {
+          showToast(`添加 ${file.name} 到知识库失败: ${error.message}`, 'error');
+        }
       }
     } catch (e) {
       card.innerHTML += '<div style="color:var(--warm);font-size:0.82rem">处理失败：' + e.message + '</div>';
     }
+  }
+  
+  if (filesKbSyncEnabled && kbAddedCount > 0) {
+    showToast(`已自动添加 ${kbAddedCount} 个文件到知识库`, 'success');
+  }
+}
+
+async function addFileToKbFromDrop(data, fileName, isImage) {
+  const category = prompt('选择知识库分类：\n1. 病例摘要\n2. 提问整理\n3. 基础医学\n4. 临床诊断\n5. 产前筛查\n6. 遗传咨询\n7. 自定义', '病例摘要') || '病例摘要';
+  
+  try {
+    if (isImage) {
+      // 图片数据，从聊天附件逻辑中使用
+      const file = dataURLtoFile(decodeURIComponent(data), fileName);
+      await addFileToKnowledgeBase(file, category);
+    } else {
+      // 文本数据
+      const text = decodeURIComponent(data);
+      const file = new File([text], fileName, { type: 'text/plain' });
+      await addFileToKnowledgeBase(file, category);
+    }
+    showToast(`已添加 ${fileName} 到知识库`, 'success');
+  } catch (error) {
+    showToast(`添加失败: ${error.message}`, 'error');
   }
 }
 
@@ -1181,6 +1347,264 @@ function sendFileToChat(data, fileName, isImage) {
     input.value = '请分析以下文件内容：\n[文件：' + fileName + ']\n' + decodeURIComponent(data);
   }
   input.focus();
+}
+
+/* ===== 文档生成能力 ===== */
+async function generateDocument(content, format = 'docx', title = '新雨AI生成文档') {
+  try {
+    showToast('正在生成文档...', 'info');
+    
+    let fileName = `${title}_${new Date().toISOString().slice(0,10)}`;
+    let fileContent = '';
+    let mimeType = '';
+    
+    if (format === 'word' || format === 'docx') {
+      // 生成简单的HTML格式，可以保存为.doc
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+body { font-family: 'Microsoft YaHei', Arial, sans-serif; line-height: 1.6; margin: 40px; }
+h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 30px; }
+p { margin: 15px 0; }
+table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<div>${content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')}</div>
+<p style="margin-top: 40px; color: #7f8c8d; font-size: 0.9em; border-top: 1px solid #eee; padding-top: 10px;">
+生成时间：${new Date().toLocaleString('zh-CN')}<br>
+生成工具：素问新雨临床思维AI助手
+</p>
+</body>
+</html>`;
+      
+      fileContent = htmlContent;
+      fileName += '.html';
+      mimeType = 'text/html';
+      
+    } else if (format === 'markdown' || format === 'md') {
+      fileContent = `# ${title}\n\n${content}\n\n---\n\n*生成时间：${new Date().toLocaleString('zh-CN')}*\n*生成工具：素问新雨临床思维AI助手*`;
+      fileName += '.md';
+      mimeType = 'text/markdown';
+      
+    } else if (format === 'txt') {
+      fileContent = `${title}\n${'='.repeat(title.length)}\n\n${content}\n\n---\n\n生成时间：${new Date().toLocaleString('zh-CN')}\n生成工具：素问新雨临床思维AI助手`;
+      fileName += '.txt';
+      mimeType = 'text/plain';
+    }
+    
+    // 创建Blob并下载
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast(`文档已生成：${fileName}`, 'success');
+    return fileName;
+    
+  } catch (error) {
+    console.error('生成文档失败:', error);
+    showToast(`生成文档失败: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+// AI响应中检测文档生成指令（返回对象，兼容 callExternalAI）
+function detectDocumentGeneration(message) {
+  if (!message) return null;
+  
+  const docPatterns = [
+    { pattern: /(整理|生成|创建|制作|输出)(.*?)(word文档|Word文档|doc文档|DOC文件)/, format: 'docx' },
+    { pattern: /(整理成|生成|创建)(.*?)(markdown|MD文档|md文件)/, format: 'md' },
+    { pattern: /(整理成|生成|创建)(.*?)(txt|文本文件|文本文档)/, format: 'txt' },
+    { pattern: /(保存为|导出为|输出为)(.*?)(word|Word|doc|DOC)/, format: 'docx' },
+    { pattern: /(保存为|导出为|输出为)(.*?)(markdown|md|MD)/, format: 'md' },
+    { pattern: /(保存为|导出为|输出为)(.*?)(txt|文本)/, format: 'txt' }
+  ];
+  
+  for (const { pattern, format } of docPatterns) {
+    if (pattern.test(message.toLowerCase())) {
+      const title = extractDocumentTitle(message) || '新雨AI生成文档';
+      return { shouldGenerate: true, format, title };
+    }
+  }
+  return null;
+}
+
+// 增强的AI响应生成函数
+function generateEnhancedAIResponse(query, context = '') {
+  const detection = detectDocumentGeneration(query);
+  
+  if (detection && detection.shouldGenerate) {
+    // 文档生成模式
+    const title = detection.title || extractDocumentTitle(query) || '新雨AI生成文档';
+    const docFormat = detection.format;
+    let content = '';
+    
+    if (context) {
+      content = `基于以下内容整理生成的文档：\n\n${context}\n\n`;
+    }
+    
+    // 根据查询生成结构化内容
+    if (query.includes('病例') || query.includes('患者')) {
+      content += generateMedicalCaseContent();
+    } else if (query.includes('总结') || query.includes('摘要')) {
+      content += generateSummaryContent(context);
+    } else if (query.includes('报告') || query.includes('分析')) {
+      content += generateAnalysisReport(context);
+    } else {
+      content += generateGeneralDocumentContent(context);
+    }
+    
+    const downloadPrompt = `\n\n---\n\n**文档已生成**：系统已自动为您生成${docFormat.toUpperCase()}格式文档，正在下载中...`;
+    
+    return {
+      content: content + downloadPrompt,
+      shouldGenerateDoc: true,
+      docFormat: docFormat,
+      docTitle: title,
+      docContent: content
+    };
+  }
+  
+  // 普通响应模式
+  return {
+    content: generateAIResponse(query).content,
+    shouldGenerateDoc: false
+  };
+}
+
+function extractDocumentTitle(query) {
+  // 从查询中提取可能的标题
+  const titleMatch = query.match(/["'](.*?)["']|《(.*?)》|【(.*?)】|标题[：:]\s*(.*?)(?:\n|$)/);
+  if (titleMatch) {
+    return titleMatch[1] || titleMatch[2] || titleMatch[3] || titleMatch[4] || '新雨AI生成文档';
+  }
+  
+  // 从查询开头提取
+  const simpleMatch = query.match(/^(整理|生成|创建)(.*?)(?:文档|报告|总结|word|doc|md)/i);
+  if (simpleMatch && simpleMatch[2].trim().length > 2) {
+    return simpleMatch[2].trim();
+  }
+  
+  return '新雨AI生成文档';
+}
+
+function generateMedicalCaseContent() {
+  return `# 病例分析报告
+
+## 患者基本信息
+- **姓名**：待补充
+- **性别**：待补充  
+- **年龄**：待补充
+- **就诊时间**：${new Date().toLocaleDateString('zh-CN')}
+
+## 主诉
+待补充
+
+## 现病史
+待补充
+
+## 既往史
+待补充
+
+## 体格检查
+待补充
+
+## 辅助检查
+待补充
+
+## 初步诊断
+待补充
+
+## 治疗建议
+待补充
+
+## 随访计划
+待补充
+
+---
+*本报告由素问新雨临床思维AI助手生成，仅供参考，具体诊疗请遵医嘱*`;
+}
+
+function generateSummaryContent(context) {
+  return `# 内容摘要
+
+## 核心要点
+${context ? '基于提供的内容，主要包含以下要点：' : '待补充具体内容'}
+
+${context ? `1. ${extractKeyPoints(context).slice(0, 5).join('\n1. ')}` : '1. 待补充要点一\n2. 待补充要点二\n3. 待补充要点三'}
+
+## 详细分析
+${context || '待补充详细内容'}
+
+## 结论与建议
+${context ? '根据以上分析，建议：' : '待补充结论与建议'}
+
+---
+*摘要生成时间：${new Date().toLocaleString('zh-CN')}*`;
+}
+
+function generateAnalysisReport(context) {
+  return `# 分析报告
+
+## 分析背景
+${context ? '基于以下内容进行分析：' : '待补充分析背景'}
+
+${context || '待补充具体内容'}
+
+## 分析方法
+1. 内容梳理与分类
+2. 关键信息提取
+3. 逻辑关系分析
+4. 结论推导
+
+## 分析结果
+${context ? extractKeyPoints(context).slice(0, 8).map(p => `- ${p}`).join('\n') : '- 待补充分析结果'}
+
+## 建议与对策
+${context ? '基于分析结果，建议：' : '待补充具体建议'}
+
+---
+*分析报告生成时间：${new Date().toLocaleString('zh-CN')}*`;
+}
+
+function generateGeneralDocumentContent(context) {
+  return `# 文档内容
+
+${context || '待补充具体内容'}
+
+## 文档结构
+1. 引言
+2. 主体内容
+3. 结论
+4. 参考文献
+
+## 详细内容
+${context ? context : '请在此处补充具体内容...'}
+
+---
+*文档生成时间：${new Date().toLocaleString('zh-CN')}*`;
+}
+
+function extractKeyPoints(text) {
+  // 简单的关键点提取
+  const sentences = text.split(/[。！？.!?]/).filter(s => s.trim().length > 10);
+  return sentences.slice(0, 10).map(s => s.trim());
 }
 
 function dataURLtoFile(dataurl, filename) {
@@ -1256,6 +1680,120 @@ function updateApiStatus() {
     badge.textContent = 'API 未配置';
     badge.className = 'api-badge unconfigured';
   }
+}
+
+/* ===== 知识库同步 ===== */
+let kbSyncEnabled = false;
+let filesKbSyncEnabled = false;
+
+function toggleKbSync() {
+  const checkbox = document.getElementById('kb-sync-check');
+  kbSyncEnabled = checkbox.checked;
+  showToast(kbSyncEnabled ? '已开启：上传文件将自动存入知识库' : '已关闭：上传文件仅用于聊天', 'info');
+}
+
+function toggleFilesKbSync() {
+  const checkbox = document.getElementById('files-kb-sync-check');
+  filesKbSyncEnabled = checkbox.checked;
+  const categorySelect = document.getElementById('files-category-select');
+  categorySelect.style.display = filesKbSyncEnabled ? 'inline-block' : 'none';
+  showToast(filesKbSyncEnabled ? '已开启：文件处理中心上传将自动存入知识库' : '已关闭：文件处理中心上传仅用于分析', 'info');
+}
+
+async function addFileToKnowledgeBase(file, category = '病例摘要', title = '') {
+  try {
+    let docTitle = title || file.name.replace(/\.[^/.]+$/, ''); // 移除扩展名
+    let content = '';
+    
+    if (file.type.startsWith('image/')) {
+      const b64 = await fileToBase64(file);
+      content = `![${file.name}](${b64})\n\n*图片上传于 ${new Date().toLocaleString()}*`;
+    } else {
+      content = await readFileContent(file);
+    }
+    
+    const newDoc = {
+      id: 'upload-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+      title: docTitle,
+      category: category,
+      content: content,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    
+    userDocs.push(newDoc);
+    localStorage.setItem('clinicalkb_user_docs', JSON.stringify(userDocs));
+    
+    // 更新UI
+    renderDocList();
+    renderManageList();
+    updateStats();
+    
+    return newDoc;
+  } catch (error) {
+    console.error('添加文件到知识库失败:', error);
+    throw error;
+  }
+}
+
+function handleMobileFileUploadWithKb(type) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md,.xlsx,.pptx';
+  input.multiple = true;
+  
+  input.onchange = async (e) => {
+    const files = e.target.files;
+    if (!files.length) return;
+    
+    closeMobileUploadSheet();
+    
+    // 询问是否存入知识库
+    const shouldSave = confirm('是否将这些文件存入知识库？');
+    let category = '病例摘要';
+    if (shouldSave) {
+      category = prompt('选择分类：\n1. 病例摘要\n2. 提问整理\n3. 基础医学\n4. 临床诊断\n5. 产前筛查\n6. 遗传咨询\n7. 自定义', '病例摘要') || '病例摘要';
+    }
+    
+    for (const file of files) {
+      if (shouldSave) {
+        try {
+          await addFileToKnowledgeBase(file, category);
+          showToast(`已添加 ${file.name} 到知识库`);
+        } catch (error) {
+          showToast(`添加 ${file.name} 失败: ${error.message}`, 'error');
+        }
+      }
+      
+      // 同时添加到聊天附件
+      if (type === 'image') {
+        const b64 = await fileToBase64(file);
+        const fileObj = dataURLtoFile(b64, file.name);
+        attachedFiles.push(fileObj);
+      } else {
+        const text = await readFileContent(file);
+        const fileObj = new File([text], file.name, { type: 'text/plain' });
+        attachedFiles.push(fileObj);
+      }
+    }
+    
+    // 切换到聊天页面
+    switchMobilePage('chat');
+    renderAttachments();
+    
+    // 设置输入提示
+    const mobileInput = document.getElementById('mobile-chat-input');
+    const chatInput = document.getElementById('chat-input');
+    if (type === 'image') {
+      mobileInput.value = '请分析这些图片';
+      chatInput.value = '请分析这些图片';
+    } else {
+      mobileInput.value = '请分析这些文档';
+      chatInput.value = '请分析这些文档';
+    }
+    mobileInput.focus();
+  };
+  
+  input.click();
 }
 
 /* ===== 工具函数 ===== */

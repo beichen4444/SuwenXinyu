@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -163,16 +163,12 @@ body{min-height:100vh;display:flex;overflow:hidden}
 .back-btn:hover{color:var(--ink)}
 
 /* ===== 聊天界面（对齐 Marvis 风格） ===== */
-.chat-container{display:flex;flex-direction:column;height:100%;max-width:880px;margin:0 auto;min-height:0;position:relative}
+.chat-container{display:flex;flex-direction:column;height:100%;max-width:880px;margin:0 auto;min-height:0;position:relative;overflow:hidden}
 .chat-messages{
   flex:1;overflow-y:auto;padding:20px 0 20px 0;display:flex;flex-direction:column;
   gap:16px;scroll-behavior:smooth;min-height:0
 }
-/* 滚动条美化 */
-.chat-messages::-webkit-scrollbar{width:5px}
-.chat-messages::-webkit-scrollbar-track{background:transparent}
-.chat-messages::-webkit-scrollbar-thumb{background:#d0ccc4;border-radius:10px}
-.chat-messages::-webkit-scrollbar-thumb:hover{background:#b0aba0}
+
 
 /* 回到底部按钮 */
 .scroll-to-bottom{
@@ -278,6 +274,19 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
 .attachment-chip button{background:none;border:none;cursor:pointer;font-size:0.9rem;color:var(--warm);padding:0;line-height:1}
 
 /* ===== 文件处理 ===== */
+.files-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px}
+.files-actions{display:flex;align-items:center;gap:12px}
+.kb-sync-label{
+  display:inline-flex;align-items:center;gap:4px;padding:6px 12px;
+  border:1px solid var(--border);border-radius:var(--radius);font-size:0.76rem;
+  cursor:pointer;color:var(--muted);transition:all var(--transition);background:transparent
+}
+.kb-sync-label:hover{border-color:var(--accent);color:var(--accent)}
+.kb-sync-label input[type=checkbox]{margin:0;cursor:pointer}
+#files-category-select{
+  padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:0.78rem;font-family:inherit;color:var(--ink);background:var(--surface)
+}
 #drop-zone{
   border:2px dashed var(--border);border-radius:var(--radius);padding:32px;
   text-align:center;cursor:pointer;transition:all var(--transition);margin-bottom:16px
@@ -442,9 +451,13 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
 
 /* 移动端聊天输入优化 */
 .mobile-chat-input{
-  display:none;position:fixed;bottom:0;left:0;right:0;z-index:99;
+  display:none;position:fixed;bottom:60px;left:0;right:0;z-index:101;
   background:#fff;border-top:1px solid var(--border);padding:12px 16px;
-  box-shadow:0 -2px 12px rgba(0,0,0,0.1)
+  box-shadow:0 -2px 12px rgba(0,0,0,0.1);
+  transition:bottom 0.3s ease, transform 0.3s ease;
+}
+.mobile-chat-input.keyboard-up{
+  bottom:calc(var(--keyboard-height, 0px) + 10px);
 }
 .mobile-input-row{
   display:flex;gap:10px;align-items:center;background:var(--light);
@@ -522,8 +535,9 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
   .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
   .stat-card{padding:14px 16px}
   .stat-value{font-size:1.4rem}
-  .chat-container{max-width:100%;padding-bottom:60px}
-  .chat-messages{gap:12px;padding:12px 0}
+  .chat-container{max-width:100%;padding-bottom:120px}
+  .chat-messages{gap:12px;padding:12px 0;overflow-y:auto;touch-action:none;user-select:none}
+  .chat-messages::-webkit-scrollbar{display:none}
   .msg{max-width:92%;padding:10px 14px;font-size:0.88rem}
   .chat-input-area{display:none}
   .chat-input-row{padding:6px 8px}
@@ -541,7 +555,15 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
   /* 手机专属界面显示 */
   .mobile-bottom-nav{display:block;animation:slideUp 0.3s ease-out}
   .mobile-chat-input{display:block;animation:slideUp 0.3s ease-out 0.1s both}
-  .scroll-to-bottom{bottom:70px}
+  .scroll-to-bottom{bottom:130px}
+  
+  /* 键盘弹起时聊天区域适配 */
+  .mobile-chat-input.keyboard-up ~ .chat-page {display:none}
+  body.keyboard-open .mobile-bottom-nav {display:none}
+  
+  /* 使用动态视口高度适配移动端键盘 */
+  .app-shell{min-height:100dvh}
+  .chat-container{height:100dvh}
   
   /* 手机界面动画 */
   @keyframes slideUp{
@@ -717,6 +739,9 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
         <div class="chat-tools">
           <label title="上传图片">&#128247; 图片<input type="file" accept="image/*" multiple onchange="handleFileAttach(this,'image')"></label>
           <label title="上传文件">&#128206; 文件<input type="file" accept=".pdf,.doc,.docx,.txt,.md,.xlsx,.pptx" multiple onchange="handleFileAttach(this,'file')"></label>
+          <label class="kb-sync-label" title="勾选后上传的文件将自动保存到知识库">
+            <input type="checkbox" id="kb-sync-check" onchange="toggleKbSync()"> 存入知识库
+          </label>
           <span style="font-size:0.72rem;color:var(--muted)">Shift+Enter 换行</span>
         </div>
       </div>
@@ -725,7 +750,23 @@ mark{background:#fff9c4;padding:0 2px;border-radius:2px;font-weight:500}
 
   <!-- File Processing -->
   <section class="page" id="page-files">
-    <span class="section-title">文件处理中心</span>
+    <div class="files-header">
+      <span class="section-title">文件处理中心</span>
+      <div class="files-actions">
+        <label class="kb-sync-label" title="勾选后上传的文件将自动保存到知识库">
+          <input type="checkbox" id="files-kb-sync-check" onchange="toggleFilesKbSync()"> 自动存入知识库
+        </label>
+        <select id="files-category-select" style="display:none">
+          <option value="病例摘要">病例摘要</option>
+          <option value="提问整理">提问整理</option>
+          <option value="基础医学">基础医学</option>
+          <option value="临床诊断">临床诊断</option>
+          <option value="产前筛查">产前筛查</option>
+          <option value="遗传咨询">遗传咨询</option>
+          <option value="自定义">自定义</option>
+        </select>
+      </div>
+    </div>
     <p style="font-size:0.84rem;color:var(--muted);margin-bottom:20px">上传图片或文档，新雨AI将自动分析处理。</p>
     <div id="drop-zone" onclick="document.getElementById('file-upload-input').click()">
       <div class="drop-icon">&#128229;</div>
